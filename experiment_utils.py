@@ -7,6 +7,8 @@ import time
 import math
 import numpy as np
 
+import logging
+
 def free_ram():
     with open('/proc/meminfo', 'r') as f:
         for line in f:
@@ -35,7 +37,7 @@ class Timer:
 
     def log_message(self, msg):
         s = '  ' * Timer.level + msg
-        print(s)
+        logging.debug(s)
         Timer.log.append(s)
 
     def __enter__(self):
