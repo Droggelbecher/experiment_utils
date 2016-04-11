@@ -1,0 +1,189 @@
+// To generate with this you need some proto buf includes that come with the
+// objc port (https://github.com/alexeyxo/protobuf-objc.git)
+// Beside from following the installation guide, you need to check out this repo and call proto buf like this.
+// > protoc --plugin=/usr/local/bin/protoc-gen-objc --proto_path=.:/Users/rupsch/Code/Code.3rdParty/protobuf-objc/src/compiler tracking.proto --objc_out="./"
+
+
+/*import "google/protobuf/objectivec-descriptor.proto";*/
+// option (google.protobuf.objectivec_file_options).package = "DataExchange";
+/*option (google.protobuf.objectivec_file_options).class_prefix = "TTB";*/
+/*option (google.protobuf.objectivec_file_options).relax_camel_case = true;*/
+
+
+// option java_package = "com.tomtom.concord.tracking.proto";
+
+message Track
+{
+    required uint64 startDateInMillis = 1;
+    required uint64 endDateInMillis = 2;
+
+    required uint32 distance = 3;
+
+    required double latitudeFrom = 4;
+    required double longitudeFrom = 5;
+
+    required double latitudeTo = 6;
+    required double longitudeTo = 7;
+
+    optional string locationFrom = 8;
+    optional string locationTo = 9;
+
+    repeated ProfileHistogramEntry speedUp = 10;
+    repeated ProfileHistogramEntry braking = 11;
+    repeated ProfileHistogramEntry corneringLeft = 12;
+    repeated ProfileHistogramEntry corneringRight = 13;
+
+    required uint32 drivingTime = 14;
+    required uint32 idleTime = 15;
+    
+    // iOS Specific (since on iOS we continuously change the metadata, we track this when data comes in)
+    
+    optional uint32 minEngineLoad = 110;
+    optional uint32 maxEngineLoad = 111;
+    
+    optional sint32 minCoolantTemperature = 112;
+    optional sint32 maxCoolantTemperature = 113;
+    
+    optional uint32 minManifoldPressure = 114;
+    optional uint32 maxManifoldPressure = 115;
+    
+    optional uint32 minEngineRpm = 116;
+    optional uint32 maxEngineRpm = 117;
+    
+    optional uint32 minVehicleSpeed = 118;
+    optional uint32 maxVehicleSpeed = 119;
+    
+    optional sint32 minAirTemperature = 120;
+    optional sint32 maxAirTemperature = 121;
+    
+    optional uint32 minThrottlePosition = 122;
+    optional uint32 maxThrottlePosition = 123;
+    
+    optional uint32 minFuelLevel = 124;
+    optional uint32 maxFuelLevel = 125;
+    
+    optional uint32 minMassAirFlow = 126;
+    optional uint32 maxMassAirFlow = 127;
+    
+    optional sint32 minBatteryVoltage = 128;
+    optional sint32 maxBatteryVoltage = 129;
+    
+    optional uint32 minFuelRailPressure = 130;
+    optional uint32 maxFuelRailPressure = 131;
+    
+    optional uint32 minCommandedExhaustGasRecirculation = 132;
+    optional uint32 maxCommandedExhaustGasRecirculation = 133;
+    
+    optional uint32 minBarometricPressure = 134;
+    optional uint32 maxBarometricPressure = 135;
+    
+    optional sint32 minCatalystTemperature = 136;
+    optional sint32 maxCatalystTemperature = 137;
+    
+    optional uint32 minAbsoluteLoad = 138;
+    optional uint32 maxAbsoluteLoad = 139;
+    
+    optional sint32 minAmbientAirTemperature = 140;
+    optional sint32 maxAmbientAirTemperature = 141;
+    
+    optional sint32 minEngineOilTemperature = 142;
+    optional sint32 maxEngineOilTemperature = 143;
+    
+    optional sint32 minChargeAirCoolerTemperature = 144;
+    optional sint32 maxChargeAirCoolerTemperature = 145;
+    
+    optional sint32 minExhaustGasTemperature = 146;
+    optional sint32 maxExhaustGasTemperature = 147;
+
+    optional sint32 minAccelerationAvgX = 148;
+    optional sint32 maxAccelerationAvgX = 149;
+
+    optional sint32 minAccelerationAvgY = 150;
+    optional sint32 maxAccelerationAvgY = 151;
+
+    optional sint32 minAccelerationAvgZ = 152;
+    optional sint32 maxAccelerationAvgZ = 153;
+
+    optional sint32 minAccelerationAvg = 154;
+    optional sint32 maxAccelerationAvg = 155;
+
+    optional sint32 minFuelRate = 156;
+    optional sint32 maxFuelRate = 157;
+
+    optional sint32 minAltitude = 158;
+    optional sint32 maxAltitude = 159;
+}
+
+message ProfileHistogramEntry
+{
+    required uint32 band = 1;
+    required uint64 value = 2;
+}
+
+message TrackEntry
+{
+    required double latitude = 1;
+    required double longitude = 2;
+    required uint32 distance = 3;
+    required uint64 dateInMillis = 4;
+
+    repeated TrackEntryObdChunk obdChunks = 5;
+    repeated TrackEntryDrivingEvent drivingEvents = 6;
+
+    // iOS Specific
+    optional double gpsAltitude = 20;
+    optional double gpsHorizontalAccuracy = 21;
+    optional double gpsVerticalAccuracy = 22;
+    optional double gpsCourse = 23;
+    optional double gpsSpeed = 24;
+}
+
+message TrackEntryObdChunk
+{
+    optional uint32 engineLoad = 1;
+    optional sint32 coolantTemperature = 2;
+    optional uint32 manifoldPressure = 3;
+    optional uint32 engineRpm = 4;
+    optional uint32 vehicleSpeed = 5;
+    optional sint32 airTemperature = 6;
+    optional uint32 throttlePosition = 7;
+    optional uint32 fuelLevel = 8;
+    optional uint32 massAirFlow = 9;
+    optional sint32 batteryVoltage = 10;
+    optional uint32 fuelRailPressure = 11;
+    optional uint32 commandedExhaustGasRecirculation = 12;
+    optional uint32 barometricPressure = 13;
+    optional sint32 catalystTemperature = 14;
+    optional uint32 absoluteLoad = 15;
+    optional sint32 ambientAirTemperature = 16;
+    optional sint32 engineOilTemperature = 17;
+    optional sint32 chargeAirCoolerTemperature = 18;
+    optional sint32 exhaustGasTemperature = 19;
+
+    optional sint32 accelerationAvgX = 20;
+    optional sint32 accelerationAvgY = 21;
+    optional sint32 accelerationAvgZ = 22;
+
+    optional uint32 fuelSystemStatus = 23;
+    optional uint32 fuelRate = 24;
+
+    // iOS Specific
+    optional uint64 receivingTime = 30;
+    optional uint64 odometer = 31;
+}
+
+message TrackEntryDrivingEvent
+{
+    enum Type
+    {
+        SPEED_UP = 0;
+        BRAKING = 1;
+        CORNERING_LEFT = 2;
+        CORNERING_RIGHT = 3;
+        IDLING = 4;
+    }
+
+    required Type type = 1;
+    required uint32 band = 2;
+    optional uint64 receivingTime = 3;
+}

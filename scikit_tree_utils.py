@@ -3,6 +3,50 @@
 from sklearn.tree import _tree
 from sklearn.externals import six
 
+def leaf_iter(tree, feature_names=None, class_names=None):
+
+    node_id = 0
+
+    def recurse(node_id, path=[]):
+        left_child = tree.children_left[node_id]
+        right_child = tree.children_right[node_id]
+
+        if feature_names is not None:
+            feature = feature_names[tree.feature[node_id]]
+        else:
+            feature = "X[%s]" % tree.feature[node_id]
+
+        path = path + [(feature, tree.threshold[node_id])]
+
+        if left_child == _tree.TREE_LEAF:
+            yield path
+        else:
+            recurse(left_child, path)
+            recurse(right_child, path)
+
+
+
+def analyze_tree(decision_tree, feature_names=None, class_names=None):
+
+    # for each path determine the feature with the maximum number of mentions
+
+    max_path = []
+    max_path_count = 0
+
+    for path in leaf_iter(decision_tree, feature_names, class_names):
+
+        featcount = {}
+        for feat, val in path:
+            featcount[feat] = featcount.get(feat, 0) + 1
+        count = max(featcount.values)
+        if count > max_path_count:
+            max_path = path
+            max_path_count = count
+
+    print(max_path_count)
+    print(max_path)
+
+
 
 def export_graphviz(decision_tree, out_file="tree.dot", feature_names=None,
                     max_depth=None, class_names=None, rankdir='LR'):

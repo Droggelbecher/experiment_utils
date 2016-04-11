@@ -2,3 +2,6 @@
 __pycache__
 *.pyc
 _cache
+log.txt
+*.ttp
+tracking_pb2.py
