@@ -9,45 +9,6 @@ import numpy as np
 
 import logging
 
-def free_ram():
-    with open('/proc/meminfo', 'r') as f:
-        for line in f:
-            if line.startswith('MemAvailable:'):
-                return int(line.split()[1]) * 1024
-
-
-class Timer:
-    """
-    Context manager for timing execution of code blocks
-    >>> with Timer("frobnizing"):
-    ...     a = 1 + 1 # doctest: +ELLIPSIS
-    frobnizing...
-     frobnizing done (...s)
-    """
-    log = []
-    level = 0
-    def __init__(self, name):
-        self.name = name
-
-    @classmethod
-    def pop_log(self):
-        r = self.log
-        self.log = []
-        return r
-
-    def log_message(self, msg):
-        s = '  ' * Timer.level + msg
-        logging.debug(s)
-        Timer.log.append(s)
-
-    def __enter__(self):
-        self.log_message('{}...'.format(self.name))
-        self.t = time.time()
-        Timer.level += 1
-
-    def __exit__(self, *args):
-        Timer.level -= 1
-        self.log_message('{} done ({:.3f})'.format(self.name, time.time() - self.t))
 
 class Summary:
     def __init__(self, **kws):
@@ -316,7 +277,7 @@ def align(l1, l2):
     Return slices of both sequences, shortened to the length
     of the shorter one.
     >>> align(range(5), range(10))
-    (range(0, 5), range(0, 5))
+    ([0, 1, 2, 3, 4], [0, 1, 2, 3, 4])
     >>> align("foobar", [1, 2, 3, 4])
     ('foob', [1, 2, 3, 4])
     """
@@ -372,9 +333,7 @@ def quantize(it, k):
     t_ = 0
     for t, v in it:
         if i == k:
-            yield (t_, s / i)
-            #rv.append(s / i)
-            #rt.append(t_)
+            yield (t_, s / float(i))
             t_ = t
             s = 0
             i = 0
@@ -382,11 +341,7 @@ def quantize(it, k):
         i += 1
 
     if i > 0:
-        yield (t_, s / i)
-        #rv.append(s / i)
-        #rt.append(t_)
-
-    #return zip(rt, rv)
+        yield (t_, s / float(i))
 
 def t_quantize(it, delta_t, op=sum, align=0, align_phase=0):
     """
@@ -635,7 +590,7 @@ def t_average(it, delta_t = .1):
         if t_prev is not None:
             s += v * (t - t_prev)
         if t > lt[0]:
-            yield (t, s / (t - lt[0]))
+            yield (t, s / float(t - lt[0]))
         else:
             yield (t, float(v))
         t_prev = t
@@ -736,58 +691,5 @@ def band_stop(it, T=.1):
     for t, v in it:
         h.push(t, v)
         yield (t, v - h.get(t - T))
-
-
-"""
->>> p = PickleCache("/tmp/foo.p", input_files=["bar.txt"])
->>> if p.needs_computation:
-...   p.result = 1 + 1
->>> p.result
-2
-"""
-class PickleCache:
-    def __init__(self, filename, input_files=()):
-        self.filename = filename
-        self.input_files = tuple(input_files)
-        self._result = None
-        self._result_timestamp = None
-
-    def ram_up_to_date(self):
-        if self.input_files:
-            latest = max(os.getmtime(x) for x in self.input_files)
-            return (self._result_timestamp is not None and self._result_timestamp >= latest)
-        return self._result_timestamp is not None
-
-    def file_up_to_date(self):
-        if not os.path.exists(self.filename):
-            return False
-        if self.input_files:
-            latest = max(os.getmtime(x) for x in self.input_files)
-            return os.getmtime(self.filename) >= latest
-        return True
-
-    @property
-    def needs_computation(self):
-        return not self.ram_up_to_date() and not self.file_up_to_date()
-
-    @property
-    def result(self):
-        if self.ram_up_to_date():
-            return self._result
-        if self.file_up_to_date():
-            self._result = pickle.load(open(self.filename, 'rb'))
-            self._result_timestamp = time.time()
-            return self._result
-        raise Exception('No result available!')
-
-    @result.setter
-    def set_result(self, r):
-        self._result = r
-        self._result_timestamp = time.time()
-        pickle.dump(self._result, open(self.filename, 'wb'))
-
-
-
-
 
 
