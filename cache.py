@@ -9,7 +9,7 @@ import time
 import shutil
 import logging
 
-base_directory = '_cache'
+base_directory = os.path.abspath('_cache')
 
 def cache_hash(obj):
     """
@@ -222,25 +222,25 @@ def cached(filename_kws=(), ignore_kws=(), add_filenames=(), cache_if=lambda kws
             
 
 
-def hashablize(obj):
-    """Convert a container hierarchy into one that can be hashed.
+#def hashablize(obj):
+    #"""Convert a container hierarchy into one that can be hashed.
 
-    Don't use this with recursive structures!
-    Also, this won't be useful if you pass dictionaries with
-    keys that don't have a total order.
-    Actually, maybe you're best off not using this function at all.
+    #Don't use this with recursive structures!
+    #Also, this won't be useful if you pass dictionaries with
+    #keys that don't have a total order.
+    #Actually, maybe you're best off not using this function at all.
     
-    Source: http://stackoverflow.com/questions/985294/is-the-pickling-process-deterministic
-    """
-    try:
-        hash(obj)
-    except TypeError:
-        if isinstance(obj, dict):
-            return tuple((k, hashablize(v)) for (k, v) in sorted(obj.items()))
-        elif hasattr(obj, '__iter__'):
-            return tuple(hashablize(o) for o in obj)
-        else:
-            raise TypeError("Can't hashablize object of type %r" % type(obj))
-    else:
-        return obj
+    #Source: http://stackoverflow.com/questions/985294/is-the-pickling-process-deterministic
+    #"""
+    #try:
+        #hash(obj)
+    #except TypeError:
+        #if isinstance(obj, dict):
+            #return tuple((k, hashablize(v)) for (k, v) in sorted(obj.items()))
+        #elif hasattr(obj, '__iter__'):
+            #return tuple(hashablize(o) for o in obj)
+        #else:
+            #raise TypeError("Can't hashablize object of type %r" % type(obj))
+    #else:
+        #return obj
 

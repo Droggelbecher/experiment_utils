@@ -11,8 +11,12 @@ import ttp
 import route_analysis
 from cache import cached
 import osutil
+import gmaps
 
 import numpy as np
+import numpy.linalg as LA
+
+np.set_printoptions(threshold=99999,linewidth=99999,precision=3)
 
 NAVKIT_DIR = '/home/henning/repos/gitp4/navkit/dev-guidance'
 NAVKIT_RUNDIR = NAVKIT_DIR + '/Build/Output/Binary/x86-Linux/Debug/bin'
@@ -64,7 +68,7 @@ def run_mapmatching(ttp_filename):
     ret = proc.wait()
     return MAPMATCHED_TTP_FILENAME
 
-#@cached(filename_kws = ('curfer_filename',))
+@cached(filename_kws = ('curfer_filename',))
 def curfer_to_road_ids(curfer_filename):
     trace = curfer.read_data(curfer_filename)
 
@@ -74,34 +78,78 @@ def curfer_to_road_ids(curfer_filename):
 
     positioned_ttp_filename = run_positioning(GPS_TTP_FILENAME)
     mapmatched_ttp_filename = run_mapmatching(positioned_ttp_filename)
-    road_ids = ttp.extract_roadids(mapmatched_ttp_filename)
-    return road_ids
+    path, road_id_to_endpoints = ttp.extract_roadids(mapmatched_ttp_filename)
+    assert type(road_id_to_endpoints) is dict
+    return path, road_id_to_endpoints
 
 if __name__ == '__main__':
-    np.set_printoptions(threshold=99999,linewidth=99999,precision=3)
-
     # Precondition: make sure map service runs
     # and needed navkit components are compiled
 
     prepare_positioning()
     prepare_mapmatching()
 
-    filenames = sys.argv[1:]
+    filenames = osutil.find_recursive(sys.argv[1], 'data')
 
     routes = []
+    gps_routes = []
+
+    road_ids_to_endpoints = {}
 
     for curfer_filename in filenames:
-        route = curfer_to_road_ids(curfer_filename = curfer_filename)
-        routes.append(route)
+        gps_route, r = curfer_to_road_ids(curfer_filename = curfer_filename)
+        # r: road_id => ( (enter_lat, enter_lon), (leave_lat, leave_lon) )
+        road_ids_to_endpoints.update(r)
+        routes.append(r.keys())
+        gps_routes.append(gps_route)
 
     ids, cov = route_analysis.roadid_covariance_matrix(routes)
 
-    print(ids)
-    print(cov)
+    w, v_ = LA.eig(cov)
 
+    order = np.argsort(-w)
+
+    #v = v[order]
+    v = v_[:,order]
+
+    print("routes")
     print(routes)
 
-    for i in range(len(ids)):
-        print(i, cov[i, i])
+    print("road ids sorted")
+    print(ids)
+
+    print("cov")
+    print(cov)
+
+    print("w")
+    print(w)
+
+    print("v")
+    print(v)
+
+    print("road_ids_to_endpoints")
+    print(road_ids_to_endpoints)
+
+    print("v.shape=", v.shape)
+    print("w.shape=", w.shape)
+
+    for i_e in range(0, v.shape[1]):
+        # one of the eigenvectors (they are not sorted!)
+        e = v[:,i_e] # vector of road-id indices
+
+        markers = [road_ids_to_endpoints[ids[0]][0]]
+        heatmap = [
+                (road_ids_to_endpoints[ids[x]][0][0], road_ids_to_endpoints[ids[x]][0][1], val)
+                for x, val in enumerate(e) if val > 0
+                ]
+        g = gmaps.generate_gmaps(heatmap = heatmap, markers = markers) # trips = gps_routes)
+        f = open('/tmp/gmaps_{}.html'.format(i_e), 'w')
+        f.write(g)
+        f.close()
+
+
+
+    #for i in range(len(ids)):
+        #print(i, cov[i, i])
 
 
