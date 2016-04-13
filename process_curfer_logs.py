@@ -35,6 +35,8 @@ POSITIONING_XML = '''
 </Positioning>
 '''.format(POSITIONED_TTP_DIR)
 
+MAX_EIGENVECTORS = 50
+
 
 def prepare_positioning():
     """
@@ -44,7 +46,11 @@ def prepare_positioning():
     f.write(POSITIONING_XML)
     f.close()
 
-def run_positioning(ttp_filename):
+@cached(
+        filename_kws = ['curfer_filename'],
+        ignore_kws = ['ttp_filename']
+        )
+def run_positioning(ttp_filename, curfer_filename):
     # clear log dir
     osutil.rmtree(POSITIONED_TTP_DIR)
 
@@ -61,37 +67,63 @@ def prepare_mapmatching():
     osutil.mkdir(NAVKIT_RUNDIR, '/home')
     shutil.copy(PATHMATCHERSETTINGS, 'home/')
 
-def run_mapmatching(ttp_filename):
+@cached(
+        filename_kws = ['curfer_filename'],
+        ignore_kws = ['ttp_filename']
+        )
+def run_mapmatching(ttp_filename, curfer_filename):
     os.chdir(NAVKIT_RUNDIR)
     proc = subprocess.Popen(['./OfflineMapMatcherApp', '--input', ttp_filename,
         '--output', MAPMATCHED_TTP_FILENAME])
     ret = proc.wait()
     return MAPMATCHED_TTP_FILENAME
 
-@cached(filename_kws = ('curfer_filename',))
+@cached(filename_kws = ['curfer_filename'])
 def curfer_to_road_ids(curfer_filename):
+    """
+    Convert the given curfer trace to TTP,
+    then use NavKit to position & mapmatch it and extract road ids from the result.
+    Makes heavy use of caching to minimize navkit executions.
+    Intermediate files will only exist temporarily (filenames are being reused!)
+    """
+
     trace = curfer.read_data(curfer_filename)
 
     gps_ttp = curfer.generate_ttp(trace)
     with open(GPS_TTP_FILENAME, 'w') as f:
         f.write(gps_ttp)
 
-    positioned_ttp_filename = run_positioning(GPS_TTP_FILENAME)
-    mapmatched_ttp_filename = run_mapmatching(positioned_ttp_filename)
-    path, road_id_to_endpoints = ttp.extract_roadids(mapmatched_ttp_filename)
+    @cached(
+            filename_kws = ['curfer_filename'],
+            ignore_kws = ['mapmatched_ttp_filename']
+            )
+    def get_road_ids(mapmatched_ttp_filename, curfer_filename):
+        return ttp.extract_roadids(mapmatched_ttp_filename)
+
+    positioned_ttp_filename = run_positioning(
+            ttp_filename = GPS_TTP_FILENAME,
+            curfer_filename = curfer_filename
+            )
+    mapmatched_ttp_filename = run_mapmatching(
+            ttp_filename = positioned_ttp_filename,
+            curfer_filename = curfer_filename
+            )
+    path, road_id_to_endpoints = get_road_ids(
+            mapmatched_ttp_filename = mapmatched_ttp_filename,
+            curfer_filename = curfer_filename
+            )
     return path, road_id_to_endpoints
 
 
-def render_road_ids(endpoints, filename):
+def render_road_ids(endpoints, filename, info = {}):
     """
     endpoints = [
         ( (lat, lon), (lat, lon), weight )
     ]
     """
-    trips = [
-            [(from_[0], from_[1], w), (to[0], to[1], w)] for from_, to, w in endpoints
-            ]
-    g = gmaps.generate_gmaps(center = endpoints[0][0], trips = trips)
+    trips = [ [from_, to] for from_, to, w in endpoints ]
+    trip_weights = [ w for from_, to, w in endpoints ]
+    g = gmaps.generate_gmaps(center = endpoints[0][0], trips = trips, trip_weights = trip_weights, info = info)
 
     f = open(filename, 'w')
     f.write(g)
@@ -112,6 +144,9 @@ if __name__ == '__main__':
 
     road_ids_to_endpoints = {}
 
+    # Read in / convert all the curfer files
+    # ---> routes and road_id => endpoint conversion
+
     for curfer_filename in filenames:
         gps_route, r = curfer_to_road_ids(curfer_filename = curfer_filename)
         # r: road_id => ( (enter_lat, enter_lon), (leave_lat, leave_lon) )
@@ -119,14 +154,15 @@ if __name__ == '__main__':
         routes.append(r.keys())
         gps_routes.append(gps_route)
 
+    # Generate road id covariance matrix and calculate its eigenvectors
+
     ids, means, cov = route_analysis.roadid_covariance_matrix(routes)
+    w, v = LA.eig(cov)
 
-    w, v_ = LA.eig(cov)
-
+    # w: eigenvalues, v: eigenvectors
     order = np.argsort(-w)
-
-    #v = v[order]
-    v = v_[:,order]
+    v = v[:,order]
+    w = w[order]
 
     print("routes")
     print(routes)
@@ -165,15 +201,9 @@ if __name__ == '__main__':
 
     render_road_ids(endpoints, '/tmp/gmaps_mean.html')
 
-    #print("heatmap=", heatmap)
-    #g = gmaps.generate_gmaps(heatmap = heatmap, center = road_ids_to_endpoints[ids[0]][0]) # trips = gps_routes)
-    #f = open('/tmp/gmaps_mean.html', 'w')
-    #f.write(g)
-    #f.close()
-
     # Render Eigenvectors
 
-    for i_e in range(0, v.shape[1]):
+    for i_e in range(0, min(MAX_EIGENVECTORS, v.shape[1])):
         # one of the eigenvectors (they are not sorted!)
         e = v[:,i_e] # vector of road-id indices
 
@@ -184,14 +214,5 @@ if __name__ == '__main__':
                 for x, val in enumerate(e)
                 ]
 
-        render_road_ids(endpoints, '/tmp/gmaps_{}.html'.format(i_e))
-
-        #heatmap = [
-                #(road_ids_to_endpoints[ids[x]][0][0], road_ids_to_endpoints[ids[x]][0][1], val)
-                #for x, val in enumerate(e) if val > 0
-                #]
-        #g = gmaps.generate_gmaps(heatmap = heatmap, center = road_ids_to_endpoints[ids[0]][0]) # trips = gps_routes)
-        #f = open('/tmp/gmaps_{}.html'.format(i_e), 'w')
-        #f.write(g)
-        #f.close()
+        render_road_ids(endpoints, '/tmp/gmaps_{}.html'.format(i_e), info = { 'Eigenvalue': w[i_e] })
 

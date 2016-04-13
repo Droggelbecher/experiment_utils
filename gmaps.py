@@ -2,15 +2,14 @@
 
 def generate_gmaps(
         trips = [],
-        trip_colors = []
+        trip_weights = [],
         markers = [],
         heatmap = [],
-        center = (52.495372, 13.461614)
+        center = (52.495372, 13.461614),
+        info = {}
         ):
     """
     trips: iterable over iterable of (lat, lon) pairs
-
-    trips = [ (lat, lon), (lat, lon, w), ... ]
 
     eg: trips = [
             [ (1,2), (3,4), (5,6) ],
@@ -24,22 +23,28 @@ def generate_gmaps(
         ]
     """
 
-    colors = []
-    for trip in trips:
-        print("trip=", trip)
-        for node in trip:
-            if len(node) > 2:
-                w = float(node[2])
-                print("w=", w)
-                c = '#{:2X}{:2X}00'.format(min(int((w + 0.5) * 255 * 2), 255), min(int((0.5 - w) * 255 * 2), 255))
-            else:
-                print("w=isnich")
-                c = '#000000'
+    tw_min = min(trip_weights)
+    tw_max = max(trip_weights)
 
-            colors.append(c)
-            #trips_preprocessed.append((lat, lon, c))
+    trip_colors = ['#000000'] * len(trips)
+    trip_strokes = [0] * len(trips)
 
-    #print("trips=", trips)
+    for i, w in enumerate(trip_weights):
+        #w_rel = ((w - tw_min) / (tw_max - tw_min))
+        #green = 255 if w_rel > .5 else int(255 * 2 * w_rel)
+        #red = 255 if w_rel < .5 else int(255 * 2 * (1.0 - w_rel))
+        #trip_colors[i] = '#{:02X}{:02X}00'.format(red, green)
+
+        if w > 0:
+            trip_colors[i] = '#00FF00'
+            w_rel = w / tw_max
+            trip_strokes[i] = int(10.0 * w_rel)
+
+        elif w < 0:
+            trip_colors[i] = '#FF0000'
+            w_rel = w / tw_min
+            trip_strokes[i] = int(10.0 * w_rel)
+
 
     r = '''
 <!DOCTYPE html>
@@ -67,11 +72,15 @@ var trip_colors = [
     {}
     ];
 
+var trip_strokes = [
+    {}
+    ];
+
 function initialize()
 {{
     var mapProp = {{
         center: center,
-        zoom: 16,
+        zoom: 13,
         mapTypeId: google.maps.MapTypeId.ROADMAP
     }};
       
@@ -80,9 +89,9 @@ function initialize()
     for(var i = 0; i < trips.length; i++) {{
         var flightPath=new google.maps.Polyline({{
           path: trips[i],
-          strokeColor: colors[i % colors.length],
+          strokeColor: trip_colors[i],
           strokeOpacity: 1.0,
-          strokeWeight: 2
+          strokeWeight: trip_strokes[i]
           }});
 
         flightPath.setMap(map);
@@ -110,6 +119,11 @@ google.maps.event.addDomListener(window, 'load', initialize);
 
 <body>
 <div id="googleMap" style="width:1000px;height:800px;"></div>
+
+Min. weight: {}<br />
+Max. weight: {}<br />
+{}
+
 </body>
 </html>
 '''.format(
@@ -119,7 +133,12 @@ google.maps.event.addDomListener(window, 'load', initialize);
             + ']' for trip in trips),
         ',\n'.join('new google.maps.LatLng({}, {})'.format(lat, lon) for (lat, lon) in markers),
         ',\n'.join('{{location: new google.maps.LatLng({}, {}), weight: {:.8f} }}'.format(lat, lon, float(w)) for (lat, lon, w) in heatmap),
-        ',\n'.join('"{}"'.format(c) for c in colors),
+        ','.join('"{}"'.format(c) for c in trip_colors),
+        ','.join('{}'.format(c) for c in trip_strokes),
+
+        tw_min,
+        tw_max,
+        '<br />\n'.join('{}: {}'.format(k, v) for (k, v) in info.items())
         )
 
     return r

@@ -2,7 +2,6 @@
 
 import csv
 
-
 def extract_roadids(ttp_filename):
     """
     Requires a map-matched ttp 0.2
@@ -17,6 +16,7 @@ def extract_roadids(ttp_filename):
     prev_road_id = None
     prev_lat = None
     prev_lon = None
+    road_id = None
     for row in csv_reader:
         if row[1] == '131':
             try:
