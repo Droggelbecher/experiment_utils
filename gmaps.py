@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-def generate_gmaps(trips = [], markers = [], heatmap = []):
+def generate_gmaps(trips = [], markers = [], heatmap = [], center = (52.495372, 13.461614)):
     """
     trips: iterable over iterable of (lat, lon) pairs
 
@@ -16,8 +16,6 @@ def generate_gmaps(trips = [], markers = [], heatmap = []):
         ]
     """
 
-    print("markers=", markers)
-
     r = '''
 <!DOCTYPE html>
 <html>
@@ -25,6 +23,8 @@ def generate_gmaps(trips = [], markers = [], heatmap = []):
 <script src="http://maps.googleapis.com/maps/api/js?libraries=visualization&sensor=true_or_false"></script>
 
 <script>
+
+var center = new google.maps.LatLng({}, {});
 
 var trips = [
     {}
@@ -45,9 +45,9 @@ var colors = [
 function initialize()
 {{
     var mapProp = {{
-        center: markers[0],
-        zoom:15,
-        mapTypeId:google.maps.MapTypeId.ROADMAP
+        center: center,
+        zoom: 16,
+        mapTypeId: google.maps.MapTypeId.ROADMAP
     }};
       
     var map = new google.maps.Map(document.getElementById("googleMap"),mapProp);
@@ -88,12 +88,11 @@ google.maps.event.addDomListener(window, 'load', initialize);
 </body>
 </html>
 '''.format(
+        center[0], center[1],
         ',\n'.join('['
-        + ',\n  '.join(('new google.maps.LatLng({}, {})'.format(lat, lon) for (lat, lon) in trip))
-        + ']' for trip in trips),
-
+            + ',\n  '.join(('new google.maps.LatLng({}, {})'.format(lat, lon) for (lat, lon) in trip))
+            + ']' for trip in trips),
         ',\n'.join('new google.maps.LatLng({}, {})'.format(lat, lon) for (lat, lon) in markers),
-
         ',\n'.join('{{location: new google.maps.LatLng({}, {}), weight: {:.8f} }}'.format(lat, lon, float(w)) for (lat, lon, w) in heatmap)
         )
 

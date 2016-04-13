@@ -79,7 +79,6 @@ def curfer_to_road_ids(curfer_filename):
     positioned_ttp_filename = run_positioning(GPS_TTP_FILENAME)
     mapmatched_ttp_filename = run_mapmatching(positioned_ttp_filename)
     path, road_id_to_endpoints = ttp.extract_roadids(mapmatched_ttp_filename)
-    assert type(road_id_to_endpoints) is dict
     return path, road_id_to_endpoints
 
 if __name__ == '__main__':
@@ -103,7 +102,7 @@ if __name__ == '__main__':
         routes.append(r.keys())
         gps_routes.append(gps_route)
 
-    ids, cov = route_analysis.roadid_covariance_matrix(routes)
+    ids, means, cov = route_analysis.roadid_covariance_matrix(routes)
 
     w, v_ = LA.eig(cov)
 
@@ -117,6 +116,9 @@ if __name__ == '__main__':
 
     print("road ids sorted")
     print(ids)
+
+    print("means")
+    print(means)
 
     print("cov")
     print(cov)
@@ -133,16 +135,27 @@ if __name__ == '__main__':
     print("v.shape=", v.shape)
     print("w.shape=", w.shape)
 
+
+    heatmap = [
+            (road_ids_to_endpoints[ids[x]][0][0], road_ids_to_endpoints[ids[x]][0][1], val)
+            for x, val in enumerate(means) if val > 0
+            ]
+    print("heatmap=", heatmap)
+    g = gmaps.generate_gmaps(heatmap = heatmap, center = road_ids_to_endpoints[ids[0]][0]) # trips = gps_routes)
+    f = open('/tmp/gmaps_mean.html', 'w')
+    f.write(g)
+    f.close()
+
+
     for i_e in range(0, v.shape[1]):
         # one of the eigenvectors (they are not sorted!)
         e = v[:,i_e] # vector of road-id indices
 
-        markers = [road_ids_to_endpoints[ids[0]][0]]
         heatmap = [
                 (road_ids_to_endpoints[ids[x]][0][0], road_ids_to_endpoints[ids[x]][0][1], val)
                 for x, val in enumerate(e) if val > 0
                 ]
-        g = gmaps.generate_gmaps(heatmap = heatmap, markers = markers) # trips = gps_routes)
+        g = gmaps.generate_gmaps(heatmap = heatmap, center = road_ids_to_endpoints[ids[0]][0]) # trips = gps_routes)
         f = open('/tmp/gmaps_{}.html'.format(i_e), 'w')
         f.write(g)
         f.close()
