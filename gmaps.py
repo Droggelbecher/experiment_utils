@@ -1,8 +1,16 @@
 #!/usr/bin/env python
 
-def generate_gmaps(trips = [], markers = [], heatmap = [], center = (52.495372, 13.461614)):
+def generate_gmaps(
+        trips = [],
+        trip_colors = []
+        markers = [],
+        heatmap = [],
+        center = (52.495372, 13.461614)
+        ):
     """
     trips: iterable over iterable of (lat, lon) pairs
+
+    trips = [ (lat, lon), (lat, lon, w), ... ]
 
     eg: trips = [
             [ (1,2), (3,4), (5,6) ],
@@ -15,6 +23,23 @@ def generate_gmaps(trips = [], markers = [], heatmap = [], center = (52.495372, 
         ...
         ]
     """
+
+    colors = []
+    for trip in trips:
+        print("trip=", trip)
+        for node in trip:
+            if len(node) > 2:
+                w = float(node[2])
+                print("w=", w)
+                c = '#{:2X}{:2X}00'.format(min(int((w + 0.5) * 255 * 2), 255), min(int((0.5 - w) * 255 * 2), 255))
+            else:
+                print("w=isnich")
+                c = '#000000'
+
+            colors.append(c)
+            #trips_preprocessed.append((lat, lon, c))
+
+    #print("trips=", trips)
 
     r = '''
 <!DOCTYPE html>
@@ -38,8 +63,8 @@ var heatmap = [
     {}
     ];
 
-var colors = [
-    "#000000"
+var trip_colors = [
+    {}
     ];
 
 function initialize()
@@ -56,8 +81,8 @@ function initialize()
         var flightPath=new google.maps.Polyline({{
           path: trips[i],
           strokeColor: colors[i % colors.length],
-          strokeOpacity:0.8,
-          strokeWeight:2
+          strokeOpacity: 1.0,
+          strokeWeight: 2
           }});
 
         flightPath.setMap(map);
@@ -90,10 +115,11 @@ google.maps.event.addDomListener(window, 'load', initialize);
 '''.format(
         center[0], center[1],
         ',\n'.join('['
-            + ',\n  '.join(('new google.maps.LatLng({}, {})'.format(lat, lon) for (lat, lon) in trip))
+            + ',\n  '.join(('new google.maps.LatLng({}, {})'.format(t[0], t[1]) for t in trip))
             + ']' for trip in trips),
         ',\n'.join('new google.maps.LatLng({}, {})'.format(lat, lon) for (lat, lon) in markers),
-        ',\n'.join('{{location: new google.maps.LatLng({}, {}), weight: {:.8f} }}'.format(lat, lon, float(w)) for (lat, lon, w) in heatmap)
+        ',\n'.join('{{location: new google.maps.LatLng({}, {}), weight: {:.8f} }}'.format(lat, lon, float(w)) for (lat, lon, w) in heatmap),
+        ',\n'.join('"{}"'.format(c) for c in colors),
         )
 
     return r

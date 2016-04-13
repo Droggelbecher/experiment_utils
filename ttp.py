@@ -6,6 +6,7 @@ import csv
 def extract_roadids(ttp_filename):
     """
     Requires a map-matched ttp 0.2
+
     """
     road_ids_to_endpoints = {}
     path = []
@@ -39,12 +40,21 @@ def extract_roadids(ttp_filename):
                     # -> set start coordinate of new
                     road_ids_to_endpoints[road_id] = ( (lat, lon), None )
 
-                road_ids_to_endpoints[road_id]
+                road_ids_to_endpoints[road_id] = (
+                    road_ids_to_endpoints[road_id][0],
+                    (lat, lon)
+                    )
 
                 prev_road_id = road_id
                 prev_lat = lat
                 prev_lon = lon
 
+    if road_id is not None:
+        # road id changed -> set end coordinate of prev
+        road_ids_to_endpoints[prev_road_id] = (
+                road_ids_to_endpoints[prev_road_id][0],
+                (lat, lon)
+                )
     return path, road_ids_to_endpoints
 
 

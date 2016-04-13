@@ -81,6 +81,23 @@ def curfer_to_road_ids(curfer_filename):
     path, road_id_to_endpoints = ttp.extract_roadids(mapmatched_ttp_filename)
     return path, road_id_to_endpoints
 
+
+def render_road_ids(endpoints, filename):
+    """
+    endpoints = [
+        ( (lat, lon), (lat, lon), weight )
+    ]
+    """
+    trips = [
+            [(from_[0], from_[1], w), (to[0], to[1], w)] for from_, to, w in endpoints
+            ]
+    g = gmaps.generate_gmaps(center = endpoints[0][0], trips = trips)
+
+    f = open(filename, 'w')
+    f.write(g)
+    f.close()
+
+
 if __name__ == '__main__':
     # Precondition: make sure map service runs
     # and needed navkit components are compiled
@@ -136,33 +153,45 @@ if __name__ == '__main__':
     print("w.shape=", w.shape)
 
 
-    heatmap = [
-            (road_ids_to_endpoints[ids[x]][0][0], road_ids_to_endpoints[ids[x]][0][1], val)
-            for x, val in enumerate(means) if val > 0
-            ]
-    print("heatmap=", heatmap)
-    g = gmaps.generate_gmaps(heatmap = heatmap, center = road_ids_to_endpoints[ids[0]][0]) # trips = gps_routes)
-    f = open('/tmp/gmaps_mean.html', 'w')
-    f.write(g)
-    f.close()
+    # Render mean
+    #
 
+    endpoints = [
+            ((road_ids_to_endpoints[ids[x]][0][0], road_ids_to_endpoints[ids[x]][0][1]),
+             (road_ids_to_endpoints[ids[x]][1][0], road_ids_to_endpoints[ids[x]][1][1]),
+             val)
+            for x, val in enumerate(means)
+            ]
+
+    render_road_ids(endpoints, '/tmp/gmaps_mean.html')
+
+    #print("heatmap=", heatmap)
+    #g = gmaps.generate_gmaps(heatmap = heatmap, center = road_ids_to_endpoints[ids[0]][0]) # trips = gps_routes)
+    #f = open('/tmp/gmaps_mean.html', 'w')
+    #f.write(g)
+    #f.close()
+
+    # Render Eigenvectors
 
     for i_e in range(0, v.shape[1]):
         # one of the eigenvectors (they are not sorted!)
         e = v[:,i_e] # vector of road-id indices
 
-        heatmap = [
-                (road_ids_to_endpoints[ids[x]][0][0], road_ids_to_endpoints[ids[x]][0][1], val)
-                for x, val in enumerate(e) if val > 0
+        endpoints = [
+                ((road_ids_to_endpoints[ids[x]][0][0], road_ids_to_endpoints[ids[x]][0][1]),
+                 (road_ids_to_endpoints[ids[x]][1][0], road_ids_to_endpoints[ids[x]][1][1]),
+                 float(val))
+                for x, val in enumerate(e)
                 ]
-        g = gmaps.generate_gmaps(heatmap = heatmap, center = road_ids_to_endpoints[ids[0]][0]) # trips = gps_routes)
-        f = open('/tmp/gmaps_{}.html'.format(i_e), 'w')
-        f.write(g)
-        f.close()
 
+        render_road_ids(endpoints, '/tmp/gmaps_{}.html'.format(i_e))
 
-
-    #for i in range(len(ids)):
-        #print(i, cov[i, i])
-
+        #heatmap = [
+                #(road_ids_to_endpoints[ids[x]][0][0], road_ids_to_endpoints[ids[x]][0][1], val)
+                #for x, val in enumerate(e) if val > 0
+                #]
+        #g = gmaps.generate_gmaps(heatmap = heatmap, center = road_ids_to_endpoints[ids[0]][0]) # trips = gps_routes)
+        #f = open('/tmp/gmaps_{}.html'.format(i_e), 'w')
+        #f.write(g)
+        #f.close()
 
