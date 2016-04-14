@@ -10,7 +10,37 @@ from collections import Counter
 
 csv.field_size_limit(sys.maxsize)
 
+def routes_to_array(routes, ids):
+    """
+    routes: iterable over (iterable over route ids)
+    ids: array of all possible road ids, sorted
+
+    return: sparse matrix with shape (len(routes), len(ids)),
+        containing 1 if road id belongs to that route
+    """
+    #a = scipy.sparse.lil_matrix(0, (len(routes), len(ids)), dtype=np.bool_)
+    a = np.zeros(shape=(len(routes), len(ids)))
+
+    for i, route in enumerate(routes):
+        for r in route:
+            # linear search to find route index from route id
+            for j, id_ in enumerate(ids):
+                if id_ == r:
+                    a[i, j] = 1
+                    break
+    return a
+
 def roadid_covariance_matrix(routes):
+    """
+    routes: iterable over (iterarable over road ids)
+
+    return: tuple (ids, means, covariance)
+        ids: array of all possible road ids, sorted
+        means: array of means (1d, 1 mean for each road-id in order)
+        covariance: covariance matrix len(ids)*len(ids)
+
+        len(ids) == len(means)
+    """
     all_road_ids = set()
     for route in routes:
         all_road_ids.update(route)
