@@ -20,7 +20,7 @@ from cache import cached
 import osutil
 import gmaps
 from timer import Timer
-
+import plots
 from navkit import prepare_positioning, prepare_mapmatching, run_positioning, run_mapmatching
 
 np.set_printoptions(threshold=99999,linewidth=99999,precision=3)
@@ -113,17 +113,14 @@ def plot_pc2(a, filename):
     routes: np array, rows: routes, columns: road_ids, elems in {0, 1}
     """
 
-    # Only take first 2 principal components
-    #v_ = np.transpose(v[:,:2])
-
-    #print("routes.shape=", routes.shape, "v.shape=", v.shape, " v[:,:2].shape=", v[:,:2].shape)
-    #a = np.dot(routes, v[:,:2])
-
+    # 2 2d suplots
 
     fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+    ax = fig.add_subplot(211)
+    ax.scatter(a[:,0], a[:,1])
 
-    ax.scatter(a[:,0], a[:,1], a[:,2])
+    ax = fig.add_subplot(212)
+    ax.scatter(a[:,0], a[:,2])
     plt.savefig(filename)
 
 
@@ -172,6 +169,11 @@ if __name__ == '__main__':
     #
     plot_pc2(np.dot(a, v[:,:3]), '/tmp/pca.pdf')
 
+    pca = PCA(n_components=10)
+    S_pca_ = pca.fit(a).transform(a)
+
+    plot_pc2(S_pca_, '/tmp/pca2.pdf')
+
 
 
     print("---a=")
@@ -180,9 +182,12 @@ if __name__ == '__main__':
 
 
     with Timer('ICA'):
-        ica = FastICA(max_iter=2000,
+        ica = FastICA(
+                max_iter=2000,
+                n_components=10,
                 fun='exp',
-                n_components=10)
+                ) #max_iter=20000,
+                #tol = 0.000001,
                 #fun='cube',
                 #n_components=3)
         #print(a)
@@ -191,6 +196,7 @@ if __name__ == '__main__':
         #S_ica_ /= S_ica_.std(axis=0)
 
     plot_pc2(S_ica_, '/tmp/ica.pdf')
+    plots.all_relations(S_ica_)
 
     print("ica_=", ica.components_.shape)
     print("ica_ components", ica.components_.T)
