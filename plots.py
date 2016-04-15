@@ -5,7 +5,7 @@
 
 import matplotlib.pyplot as plt
 
-def all_relations(a):
+def all_relations(a, filename):
     """
     a: np array, rows for data, columns for features/axes
     """
@@ -23,5 +23,5 @@ def all_relations(a):
             axs[row, column].scatter(a[:,column], a[:,row])
 
     f.set_size_inches((2*features, 2*features))
-    f.savefig('/tmp/all_relations.pdf', dpi=100)
+    f.savefig(filename, dpi=100)
 

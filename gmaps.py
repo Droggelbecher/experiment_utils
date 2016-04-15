@@ -1,12 +1,47 @@
 #!/usr/bin/env python
 
+
+def generate_html_bar_graph(heights, names = None):
+    width = len(heights) * 24
+    height = 100
+
+    min_ = min(heights)
+    max_ = max(heights)
+
+    hs = [height*h/max_ if h > 0 else -height*h/min_ for h in heights]
+
+    r = ''
+
+    r += '<div style="width: {}px; height: {}px; border: 1px solid #a0a0a0">'.format(width, height)
+    for h in hs:
+        r += '<div style="height: {}px; width: 20px; margin: 2px; display: inline-block; position: relative; background-color: #00ff00; vertical-align: baseline;"></div>'.format(h if h > 0 else 0)
+    r += '</div>'
+
+    if min_ < 0:
+        r += '<div style="width: {}px; height: {}px; border: 1px solid #a0a0a0">'.format(width, height)
+        for h in hs:
+            r += '<div style="height: {}px; width: 20px; margin: 2px; display: inline-block; position: relative; background-color: #ff0000; vertical-align: top;"></div>'.format(-h if h < 0 else 0)
+        r += '</div>'
+
+
+    if names is not None:
+        r += '<div style="width: {}px; border: 1px solid #a0a0a0">'.format(width)
+        for name in names:
+            r += '<div style="width: 20px; margin: 2px; display: inline-block; position: relative; vertical-align: baseline;">{}</div>'.format(name)
+        r += '</div>'
+
+    r += '<br />Min: {}<br />Max: {}'.format(min_, max_)
+
+    return r
+
+
 def generate_gmaps(
         trips = [],
         trip_weights = [],
         markers = [],
         heatmap = [],
         center = (52.495372, 13.461614),
-        info = {}
+        info = []
         ):
     """
     trips: iterable over iterable of (lat, lon) pairs
@@ -138,7 +173,14 @@ Max. weight: {}<br />
 
         tw_min,
         tw_max,
-        '<br />\n'.join('{}: {}'.format(k, v) for (k, v) in info.items())
+        '<br />\n'.join(info)
         )
 
     return r
+
+
+if __name__ == '__main__':
+    f = open('/tmp/test.html', 'w')
+    f.write(generate_html_bar_graph([20, -30, 50, 0, 200, 99, -70], ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']))
+    f.close
+

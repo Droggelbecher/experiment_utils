@@ -12,6 +12,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA, FastICA
 import math
+from datetime import datetime
 
 import curfer
 import ttp
@@ -27,7 +28,7 @@ np.set_printoptions(threshold=99999,linewidth=99999,precision=3)
 
 
 GPS_TTP_FILENAME = '/tmp/gps.ttp'
-MAX_EIGENVECTORS = 50
+MAX_COMPONENTS = 50
 
 @cached(filename_kws = ['curfer_filename'])
 def curfer_to_road_ids(curfer_filename):
@@ -59,27 +60,12 @@ def curfer_to_road_ids(curfer_filename):
             ttp_filename = positioned_ttp_filename,
             curfer_filename = curfer_filename
             )
-    path, road_id_to_endpoints = get_road_ids(
+    d = get_road_ids(
             mapmatched_ttp_filename = mapmatched_ttp_filename,
             curfer_filename = curfer_filename
             )
-    return path, road_id_to_endpoints
+    return d
 
-
-def render_road_ids(endpoints, filename, info = {}):
-    """
-    endpoints = [
-        ( (lat, lon), (lat, lon), weight )
-    ]
-    """
-    trips = [ [from_, to] for from_, to, w in endpoints ]
-    #trip_weights = [ math.tanh(w * 10) for from_, to, w in endpoints ]
-    trip_weights = [ w for from_, to, w in endpoints ]
-    g = gmaps.generate_gmaps(center = endpoints[0][0], trips = trips, trip_weights = trip_weights, info = info)
-
-    f = open(filename, 'w')
-    f.write(g)
-    f.close()
 
 def preprocess_data(curfer_directory):
     # Precondition: make sure map service runs
@@ -91,21 +77,38 @@ def preprocess_data(curfer_directory):
     filenames = osutil.find_recursive(sys.argv[1], 'data')
 
     routes = []
-    gps_routes = []
-
+    coordinate_routes = []
+    departure_times = []
+    arrival_times = []
     road_ids_to_endpoints = {}
 
     # Read in / convert all the curfer files
     # ---> routes and road_id => endpoint conversion
 
     for curfer_filename in filenames:
-        gps_route, r = curfer_to_road_ids(curfer_filename = curfer_filename)
-        # r: road_id => ( (enter_lat, enter_lon), (leave_lat, leave_lon) )
-        road_ids_to_endpoints.update(r)
-        routes.append(r.keys())
-        gps_routes.append(gps_route)
+        d = curfer_to_road_ids(curfer_filename = curfer_filename)
 
-    return routes, gps_routes, road_ids_to_endpoints
+        road_ids_to_endpoints.update(d['road_ids_to_endpoints'])
+        routes.append(d['roadids'])
+        coordinate_routes.append(d['coordinates'])
+        departure_times.append(d['departure_time'])
+        arrival_times.append(d['departure_time'])
+
+        #gps_route, r = curfer_to_road_ids(curfer_filename = curfer_filename)
+
+        # r: road_id => ( (enter_lat, enter_lon), (leave_lat, leave_lon) )
+        #road_ids_to_endpoints.update(r)
+        #routes.append(r.keys())
+        #gps_routes.append(gps_route)
+
+    #return routes, gps_routes, road_ids_to_endpoints
+    return {
+            'routes': routes,
+            'coordinate_routes': coordinate_routes,
+            'departure_times': departure_times,
+            'arrival_times': arrival_times,
+            'road_ids_to_endpoints': road_ids_to_endpoints,
+            }
 
 
 def plot_pc2(a, filename):
@@ -125,61 +128,49 @@ def plot_pc2(a, filename):
 
 
 if __name__ == '__main__':
-    routes, gps_routes, road_ids_to_endpoints = preprocess_data(sys.argv[1])
+    d = preprocess_data(sys.argv[1])
 
-    # Generate road id covariance matrix and calculate its eigenvectors
+    routes = d['routes']
+    road_ids_to_endpoints = d['road_ids_to_endpoints']
 
-    ids, means, cov = route_analysis.roadid_covariance_matrix(routes)
-    w, v = LA.eig(cov)
+    with Timer('sort road ids'):
+        sorted_road_ids = np.array(sorted(road_ids_to_endpoints.keys()))
 
-    # w: eigenvalues, v: eigenvectors
-    order = np.argsort(-w)
-    v = v[:,order]
-    w = w[order]
+    print("routes=", routes)
+    print("sorted_road_ids=", sorted_road_ids)
 
-    print("routes")
-    print(routes)
+    with Timer('road ids to array'):
+        a_road_ids = route_analysis.routes_to_array(routes, sorted_road_ids)
 
-    print("road ids sorted")
-    print(ids)
+    with Timer('time features'):
+        a_weekdays = np.zeros(shape=(len(routes), 7))
+        a_hours = np.zeros(shape=(len(routes), 24))
+        #print(d['departure_times'])
+        for i, departure_time in enumerate(d['departure_times']):
+            try:
+                dt = datetime.utcfromtimestamp(departure_time)
+                print("dt=", departure_time, dt)
+                a_weekdays[i, dt.weekday()] = 1.0
+                a_hours[i, dt.hour] = 1.0
+            except TypeError:
+                pass
 
-    print("means")
-    print(means)
+        non_roadid_features = 7 + 24
 
-    print("cov")
-    print(cov)
+    print(a_weekdays.shape, a_weekdays)
+    print(a_hours.shape, a_hours)
+    print(a_road_ids.shape, a_road_ids)
+    #print(a_weekdays.shape, a_hours.shape, a_road_ids.shape)
 
-    print("w")
-    print(w)
+    with Timer('hstack'):
+        X = np.hstack((a_weekdays, a_hours, a_road_ids))
 
-    print("v")
-    print(v)
+    with Timer('PCA'):
+        pca = PCA(n_components=10)
+        S_pca = pca.fit(X).transform(X)
 
-    print("road_ids_to_endpoints")
-    print(road_ids_to_endpoints)
-
-    print("v.shape=", v.shape)
-    print("w.shape=", w.shape)
-
-    with Timer('routes to matrix'):
-        a = route_analysis.routes_to_array(routes, ids)
-
-
-    # Plot routes on PCs
-    #
-    plot_pc2(np.dot(a, v[:,:3]), '/tmp/pca.pdf')
-
-    pca = PCA(n_components=10)
-    S_pca_ = pca.fit(a).transform(a)
-
-    plot_pc2(S_pca_, '/tmp/pca2.pdf')
-
-
-
-    print("---a=")
-    print(a.shape)
-    print(a)
-
+    with Timer('plot PCA'):
+        plots.all_relations(S_pca, '/tmp/pca.pdf')
 
     with Timer('ICA'):
         ica = FastICA(
@@ -190,54 +181,61 @@ if __name__ == '__main__':
                 #tol = 0.000001,
                 #fun='cube',
                 #n_components=3)
-        #print(a)
-        S_ica_ = ica.fit(a).transform(a)  # Estimate the sources
-        #print(ica.get_params())
-        #S_ica_ /= S_ica_.std(axis=0)
+        S_ica = ica.fit(X).transform(X)  # Estimate the sources
 
-    plot_pc2(S_ica_, '/tmp/ica.pdf')
-    plots.all_relations(S_ica_)
+    with Timer('plot ICA'):
+        plots.all_relations(S_ica, '/tmp/ica.pdf')
 
-    print("ica_=", ica.components_.shape)
-    print("ica_ components", ica.components_.T)
-    print("ica_ mixing", ica.mixing_)
-    print("ica_ mean", ica.mean_)
-    print("ica_ whitening", ica.whitening_)
-    del v
-    v = ica.components_.T
-    #v = ica.mixing_
+    def render_road_ids(weights, name):
 
-    #v = S_ica_
+        trips = [road_ids_to_endpoints[id_] for id_ in sorted_road_ids]
+        trip_weights = weights[non_roadid_features:]
+        filename = '/tmp/gmaps_{}.html'.format(name)
+
+        info = [
+                gmaps.generate_html_bar_graph(weights[:7], ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']),
+                gmaps.generate_html_bar_graph(weights[7:7+24], [str(i) for i in range(24)]),
+                ]
 
 
+        #info = [ 'WD {}: {:10.8f}'.format(i, mean[i]) for i in range(7) ] \
+                #+ [ 'HR {}: {:10.8f}'.format(i, mean[i + 7]) for i in range(24) ]
+        #)
+
+        g = gmaps.generate_gmaps(
+                center = trips[0][0],
+                trips = trips,
+                trip_weights = trip_weights,
+                info = info)
+
+        f = open(filename, 'w')
+        f.write(g)
+        f.close()
+
+    #
     # Render mean
     #
 
-    endpoints = [
-            ((road_ids_to_endpoints[ids[x]][0][0], road_ids_to_endpoints[ids[x]][0][1]),
-             (road_ids_to_endpoints[ids[x]][1][0], road_ids_to_endpoints[ids[x]][1][1]),
-             val)
-            for x, val in enumerate(means)
-            ]
+    with Timer('gmaps mean'):
+        mean = np.average(X, axis=0)
+        render_road_ids(mean, 'mean')
 
-    render_road_ids(endpoints, '/tmp/gmaps_mean.html')
+    # Render principal components
 
-    # Render Eigenvectors
+    with Timer('gmaps PCA'):
+        components = pca.components_.T
+        for i in range(min(MAX_COMPONENTS, components.shape[1])):
+            component = components[:,i]
+            render_road_ids(component, 'pc_{}'.format(i))
 
-    for i_e in range(0, min(MAX_EIGENVECTORS, v.shape[1])):
-        # one of the eigenvectors (they are not sorted!)
-        e = v[:,i_e] # vector of road-id indices
-        print("e.shape=", e.shape)
+    # Render independent components
 
-        endpoints = [
-                ((road_ids_to_endpoints[ids[x]][0][0], road_ids_to_endpoints[ids[x]][0][1]),
-                 (road_ids_to_endpoints[ids[x]][1][0], road_ids_to_endpoints[ids[x]][1][1]),
-                 float(val))
-                for x, val in enumerate(e)
-                ]
+    with Timer('gmaps ICA'):
+        components = ica.components_.T
+        for i in range(min(MAX_COMPONENTS, components.shape[1])):
+            component = components[:,i]
+            render_road_ids(component, 'ic_{}'.format(i))
 
-        render_road_ids(endpoints, '/tmp/gmaps_{}.html'.format(i_e), info = { 'Eigenvalue': w[i_e] })
-
-
+    print('\n'.join(Timer.pop_log()))
 
 
