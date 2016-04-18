@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import json
+
 
 def generate_html_bar_graph(heights, names = None):
     width = len(heights) * 24
@@ -149,6 +151,7 @@ function initialize()
     }}
 
     for(var i = 0; i < circles.length; i++) {{
+    /*
         var circle = new google.maps.Circle({{
           center: circles[i].center,
           radius: circles[i].r,
@@ -159,6 +162,8 @@ function initialize()
           fillOpacity: 0.3,
           map: map
           }});
+          */
+        var circle = circles[i];
 
         circle.setMap(map);
     }}
@@ -192,7 +197,10 @@ Max. weight: {}<br />
         ',\n'.join('{{location: new google.maps.LatLng({}, {}), weight: {:.8f} }}'.format(lat, lon, float(w)) for (lat, lon, w) in heatmap),
         ','.join('"{}"'.format(c) for c in trip_colors),
         ','.join('{}'.format(c) for c in trip_strokes),
-        ','.join('{{ center: {{ lat: {}, lng: {} }}, r: {} }}'.format(*c) for c in circles),
+        ','.join('new google.maps.Circle({})'.format(json.dumps(c)) for c in circles),
+            
+            
+            #'{{ center: {{ lat: {}, lng: {} }}, r: {} }}'.format(*c) for c in circles),
 
         tw_min,
         tw_max,

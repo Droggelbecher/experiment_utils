@@ -55,6 +55,8 @@ class Routes:
         self.hours_end = p
         self.arrival_start = p; p+= 2
         self.arrival_end = p
+        self.departure_start = p; p+= 2
+        self.departure_end = p
 
         self.routes_start = p
 
@@ -76,17 +78,10 @@ class Routes:
             a_weekdays,
             a_hours,
             a_arrival,
+            a_departure,
             a_road_ids
             ))
 
-    def get_endpoints(self):
-        return self.endpoints
-
-    #def get_arrivals(self):
-        #return self.arrivals
-
-    #def get_departures(self):
-        #return self.departures
 
 @cached(filename_kws = ['curfer_filename'])
 def curfer_to_road_ids(curfer_filename):
@@ -161,7 +156,7 @@ def preprocess_data(curfer_directory):
             }
 
 def render_road_ids(r, weights, name):
-    trips = r.get_endpoints()
+    trips = r.endpoints
     trip_weights = weights[r.routes_start:]
     filename = '/tmp/gmaps_{}.html'.format(name)
 
@@ -216,8 +211,10 @@ def cluster_routes(r):
 
         weights /= len(routes)
 
-        radius = max(geo.distance(row[r.arrival_start], row[r.arrival_start + 1],
+        arrival_radius = max(geo.distance(row[r.arrival_start], row[r.arrival_start + 1],
             weights[r.arrival_start], weights[r.arrival_start + 1]) for row in routes)
+        departure_radius = max(geo.distance(row[r.departure_start], row[r.departure_start + 1],
+            weights[r.departure_start], weights[r.departure_start + 1]) for row in routes)
 
         g = gmaps.generate_gmaps(
                 center = trips[0][0],
@@ -225,7 +222,17 @@ def cluster_routes(r):
                 trip_colors = trip_colors,
                 default_color = '#ff00ff',
                 markers = [ weights[r.arrival_start:r.arrival_start+2] ],
-                circles = [ (weights[r.arrival_start], weights[r.arrival_start+1], radius) ],
+                circles = [
+                    {
+                        'center': { 'lat': weights[r.arrival_start], 'lng': weights[r.arrival_start+1] },
+                        'radius': arrival_radius,
+                        'strokeColor': '#ff0000',
+                    },
+                    {
+                        'center': { 'lat': weights[r.departure_start], 'lng': weights[r.departure_start+1] },
+                        'radius': departure_radius,
+                        'strokeColor': '#00ff00',
+                    }],
                 info = [
                     'routes: {}'.format(len(routes)),
                     gmaps.generate_html_bar_graph(weights[:r.weekdays_end], ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']),
