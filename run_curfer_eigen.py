@@ -180,7 +180,7 @@ def cluster_routes(r):
     metric = route_analysis.route_distance_jaccard
     #metric = route_analysis.route_distance_h1
 
-    dbscan = DBSCAN(eps = 0.3, metric = metric).fit(r.X)
+    dbscan = DBSCAN(eps = 0.4, metric = metric).fit(r.X)
     labels = dbscan.labels_
     labels_unique = set(labels)
 
@@ -234,7 +234,9 @@ def cluster_routes(r):
                         'strokeColor': '#00ff00',
                     }],
                 info = [
-                    'routes: {}'.format(len(routes)),
+                    '# routes: {}'.format(len(routes)),
+                    'departure radius (green): {}'.format(departure_radius),
+                    'arrival radius (red): {}'.format(arrival_radius),
                     gmaps.generate_html_bar_graph(weights[:r.weekdays_end], ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']),
                     gmaps.generate_html_bar_graph(weights[r.hours_start:r.hours_end], [str(i) for i in range(24)]),
                     ]
@@ -260,9 +262,9 @@ if __name__ == '__main__':
 
     with Timer('ICA'):
         ica = FastICA(
-                max_iter=4000,
+                max_iter=32000,
                 n_components=MAX_COMPONENTS,
-                fun='exp',
+                #fun='exp',
                 )
         S_ica = ica.fit(r.X).transform(r.X)  # Estimate the sources
 

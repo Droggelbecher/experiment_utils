@@ -151,20 +151,7 @@ function initialize()
     }}
 
     for(var i = 0; i < circles.length; i++) {{
-    /*
-        var circle = new google.maps.Circle({{
-          center: circles[i].center,
-          radius: circles[i].r,
-          strokeWeight: 2,
-          strokeOpacity: 0.8,
-          strokeColor: '#ff0000',
-          fillColor: '#ff0000',
-          fillOpacity: 0.3,
-          map: map
-          }});
-          */
         var circle = circles[i];
-
         circle.setMap(map);
     }}
 
