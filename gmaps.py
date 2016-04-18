@@ -41,6 +41,7 @@ def generate_gmaps(
         trip_colors = [],
         markers = [],
         heatmap = [],
+        circles = [],
         center = (52.495372, 13.461614),
         info = [],
         default_color = '#000000'
@@ -63,7 +64,7 @@ def generate_gmaps(
     if not len(trip_colors):
         trip_colors = [default_color] * len(trips)
 
-    trip_strokes = [2] * len(trips)
+    trip_strokes = [4] * len(trips)
 
     tw_min = 0
     tw_max = 1
@@ -113,6 +114,10 @@ var trip_strokes = [
     {}
     ];
 
+var circles = [
+    {}
+    ];
+
 function initialize()
 {{
     var mapProp = {{
@@ -127,7 +132,7 @@ function initialize()
         var flightPath=new google.maps.Polyline({{
           path: trips[i],
           strokeColor: trip_colors[i],
-          strokeOpacity: 1.0,
+          strokeOpacity: 0.8,
           strokeWeight: trip_strokes[i]
           }});
 
@@ -141,6 +146,21 @@ function initialize()
           }});
 
         marker.setMap(map);
+    }}
+
+    for(var i = 0; i < circles.length; i++) {{
+        var circle = new google.maps.Circle({{
+          center: circles[i].center,
+          radius: circles[i].r,
+          strokeWeight: 2,
+          strokeOpacity: 0.8,
+          strokeColor: '#ff0000',
+          fillColor: '#ff0000',
+          fillOpacity: 0.3,
+          map: map
+          }});
+
+        circle.setMap(map);
     }}
 
     var hm = new google.maps.visualization.HeatmapLayer({{
@@ -172,6 +192,7 @@ Max. weight: {}<br />
         ',\n'.join('{{location: new google.maps.LatLng({}, {}), weight: {:.8f} }}'.format(lat, lon, float(w)) for (lat, lon, w) in heatmap),
         ','.join('"{}"'.format(c) for c in trip_colors),
         ','.join('{}'.format(c) for c in trip_strokes),
+        ','.join('{{ center: {{ lat: {}, lng: {} }}, r: {} }}'.format(*c) for c in circles),
 
         tw_min,
         tw_max,
