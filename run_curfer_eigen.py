@@ -152,14 +152,6 @@ def preprocess_data(curfer_directory):
         departure_times.append(d['departure_time'])
         arrival_times.append(d['departure_time'])
 
-        #gps_route, r = curfer_to_road_ids(curfer_filename = curfer_filename)
-
-        # r: road_id => ( (enter_lat, enter_lon), (leave_lat, leave_lon) )
-        #road_ids_to_endpoints.update(r)
-        #routes.append(r.keys())
-        #gps_routes.append(gps_route)
-
-    #return routes, gps_routes, road_ids_to_endpoints
     return {
             'routes': routes,
             'coordinate_routes': coordinate_routes,
@@ -168,20 +160,83 @@ def preprocess_data(curfer_directory):
             'road_ids_to_endpoints': road_ids_to_endpoints,
             }
 
-def plot_pc2(a, filename):
-    """
-    routes: np array, rows: routes, columns: road_ids, elems in {0, 1}
-    """
+def render_road_ids(r, weights, name):
+    trips = r.get_endpoints()
+    trip_weights = weights[r.routes_start:]
+    filename = '/tmp/gmaps_{}.html'.format(name)
 
-    # 2 2d suplots
+    info = [
+            gmaps.generate_html_bar_graph(weights[:r.weekdays_end], ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']),
+            gmaps.generate_html_bar_graph(weights[r.hours_start:r.hours_end], [str(i) for i in range(24)]),
+            ]
 
-    fig = plt.figure()
-    ax = fig.add_subplot(211)
-    ax.scatter(a[:,0], a[:,1])
+    g = gmaps.generate_gmaps(
+            center = trips[0][0],
+            trips = trips,
+            trip_weights = trip_weights,
+            info = info)
 
-    ax = fig.add_subplot(212)
-    ax.scatter(a[:,0], a[:,2])
-    plt.savefig(filename)
+    f = open(filename, 'w')
+    f.write(g)
+    f.close()
+
+
+def cluster_routes(r):
+    metric = route_analysis.route_distance_jaccard
+    #metric = route_analysis.route_distance_h1
+
+    dbscan = DBSCAN(eps = 0.3, metric = metric).fit(r.X)
+    labels = dbscan.labels_
+    labels_unique = set(labels)
+
+    # DEBUG: print some distances to check metric
+    #for i in range(10):
+        #for j in range(10):
+            #print(i, j,
+                    #route_analysis.route_distance_jaccard(r.X[i,:], r.X[j,:]),
+                    #route_analysis.route_distance_h1(r.X[i,:], r.X[j,:]))
+
+    print("DBSCAN labels = {}".format(' '.join(str(x) for x in labels_unique)))
+
+    for k in labels_unique:
+        routes = r.X[labels == k]
+
+        trips = []
+        trip_colors = []
+        colors = plt.cm.Spectral(np.linspace(0, 1, len(routes)))
+
+        weights = np.zeros(r.X.shape[1])
+
+        for c,route in zip(colors, routes):
+            weights += route
+            route = route[r.routes_start:]
+            ep = r.endpoints[route != 0]
+            trips.extend(ep)
+            trip_colors.extend([rgb2hex(c)] * len(ep))
+
+        weights /= len(routes)
+
+        radius = max(geo.distance(row[r.arrival_start], row[r.arrival_start + 1],
+            weights[r.arrival_start], weights[r.arrival_start + 1]) for row in routes)
+
+        g = gmaps.generate_gmaps(
+                center = trips[0][0],
+                trips = trips,
+                trip_colors = trip_colors,
+                default_color = '#ff00ff',
+                markers = [ weights[r.arrival_start:r.arrival_start+2] ],
+                circles = [ (weights[r.arrival_start], weights[r.arrival_start+1], radius) ],
+                info = [
+                    'routes: {}'.format(len(routes)),
+                    gmaps.generate_html_bar_graph(weights[:r.weekdays_end], ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']),
+                    gmaps.generate_html_bar_graph(weights[r.hours_start:r.hours_end], [str(i) for i in range(24)]),
+                    ]
+                )
+
+        f = open('/tmp/gmaps_dbscan_{}.html'.format(k + 1), 'w')
+        f.write(g)
+        f.close()
+
 
 
 if __name__ == '__main__':
@@ -201,111 +256,20 @@ if __name__ == '__main__':
                 max_iter=4000,
                 n_components=MAX_COMPONENTS,
                 fun='exp',
-                ) #max_iter=20000,
-                #tol = 0.000001,
-                #fun='cube',
-                #n_components=3)
+                )
         S_ica = ica.fit(r.X).transform(r.X)  # Estimate the sources
 
     with Timer('plot ICA'):
         plots.all_relations(S_ica, '/tmp/ica.pdf')
 
-    def render_road_ids(weights, name):
-        trips = r.get_endpoints() #[road_ids_to_endpoints[id_] for id_ in sorted_road_ids]
-        trip_weights = weights[r.routes_start:]
-        filename = '/tmp/gmaps_{}.html'.format(name)
-
-        info = [
-                gmaps.generate_html_bar_graph(weights[:r.weekdays_end], ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']),
-                gmaps.generate_html_bar_graph(weights[r.hours_start:r.hours_end], [str(i) for i in range(24)]),
-                ]
-
-        g = gmaps.generate_gmaps(
-                center = trips[0][0],
-                trips = trips,
-                trip_weights = trip_weights,
-                info = info)
-
-        f = open(filename, 'w')
-        f.write(g)
-        f.close()
-
-    def cluster_routes(r):
-        metric = route_analysis.route_distance_jaccard
-        #metric = route_analysis.route_distance_h1
-
-        dbscan = DBSCAN(eps = 0.3, metric = metric).fit(r.X)
-        labels = dbscan.labels_
-        labels_unique = set(labels)
-
-        #for i in range(10):
-            #for j in range(10):
-                #print(i, j,
-                        #route_analysis.route_distance_jaccard(r.X[i,:], r.X[j,:]),
-                        #route_analysis.route_distance_h1(r.X[i,:], r.X[j,:]))
-
-        print("DBSCAN labels=", labels_unique)
-
-        for k in labels_unique:
-            routes = r.X[labels == k]
-
-            trips = []
-            trip_colors = []
-            colors = plt.cm.Spectral(np.linspace(0, 1, len(routes)))
-
-            weights = np.zeros(r.X.shape[1])
-
-            for c,route in zip(colors, routes):
-                weights += route
-                route = route[r.routes_start:]
-                ep = r.endpoints[route != 0]
-                trips.extend(ep)
-                trip_colors.extend([rgb2hex(c)] * len(ep))
-
-            weights /= len(routes)
-
-            radius = max(geo.distance(row[r.arrival_start], row[r.arrival_start + 1],
-                weights[r.arrival_start], weights[r.arrival_start + 1]) for row in routes)
-
-            g = gmaps.generate_gmaps(
-                    center = trips[0][0],
-                    trips = trips,
-                    trip_colors = trip_colors,
-                    default_color = '#ff00ff',
-                    markers = [
-                        weights[r.arrival_start:r.arrival_start+2]
-                    ],
-                    circles = [
-                        (weights[r.arrival_start], weights[r.arrival_start+1], radius)
-                        ],
-                    info = [
-                        'routes: {}'.format(len(routes)),
-                        gmaps.generate_html_bar_graph(weights[:r.weekdays_end], ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']),
-                        gmaps.generate_html_bar_graph(weights[r.hours_start:r.hours_end], [str(i) for i in range(24)]),
-                        ]
-                    )
-
-            f = open('/tmp/gmaps_dbscan_{}.html'.format(k + 1), 'w')
-            f.write(g)
-            f.close()
-
     with Timer('cluster'):
         cluster_routes(r)
-
-
-    #def cluster_arrivals(r):
-        #x = r.X[:,r.
-
-        #dbscan = DBSCAN(eps = 0.3, metric = metric).fit(r.X)
-
-
-
 
     # Render mean
 
     with Timer('gmaps mean'):
         mean = np.average(r.X, axis=0)
-        render_road_ids(mean, 'mean')
+        render_road_ids(r, mean, 'mean')
 
     # Render principal components
 
@@ -313,7 +277,7 @@ if __name__ == '__main__':
         components = pca.components_.T
         for i in range(min(MAX_COMPONENTS, components.shape[1])):
             component = components[:,i]
-            render_road_ids(component, 'pc_{}'.format(i))
+            render_road_ids(r, component, 'pc_{}'.format(i))
 
     # Render independent components
 
@@ -321,7 +285,7 @@ if __name__ == '__main__':
         components = ica.components_.T
         for i in range(min(MAX_COMPONENTS, components.shape[1])):
             component = components[:,i]
-            render_road_ids(component, 'ic_{}'.format(i))
+            render_road_ids(r, component, 'ic_{}'.format(i))
 
     print('\n'.join(Timer.pop_log()))
 
