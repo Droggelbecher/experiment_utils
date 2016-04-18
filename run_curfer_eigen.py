@@ -5,30 +5,32 @@ import os
 import os.path
 import shutil
 import subprocess
-import numpy as np
-import numpy.linalg as LA
-
-from mpl_toolkits.mplot3d import Axes3D
-import matplotlib.pyplot as plt
-from sklearn.decomposition import PCA, FastICA
 import math
 from datetime import datetime
 
-import curfer
-import ttp
-import route_analysis
+from mpl_toolkits.mplot3d import Axes3D
+from sklearn.cluster import DBSCAN
+from sklearn.decomposition import PCA, FastICA
+import matplotlib.pyplot as plt
+from matplotlib.colors import rgb2hex
+import numpy as np
+import numpy.linalg as LA
+
 from cache import cached
-import osutil
-import gmaps
-from timer import Timer
-import plots
 from navkit import prepare_positioning, prepare_mapmatching, run_positioning, run_mapmatching
+from timer import Timer
+import curfer
+import gmaps
+import osutil
+import plots
+import route_analysis
+import ttp
 
 np.set_printoptions(threshold=99999,linewidth=99999,precision=3)
 
 
 GPS_TTP_FILENAME = '/tmp/gps.ttp'
-MAX_COMPONENTS = 50
+MAX_COMPONENTS = 10
 
 @cached(filename_kws = ['curfer_filename'])
 def curfer_to_road_ids(curfer_filename):
@@ -110,7 +112,6 @@ def preprocess_data(curfer_directory):
             'road_ids_to_endpoints': road_ids_to_endpoints,
             }
 
-
 def plot_pc2(a, filename):
     """
     routes: np array, rows: routes, columns: road_ids, elems in {0, 1}
@@ -132,12 +133,13 @@ if __name__ == '__main__':
 
     routes = d['routes']
     road_ids_to_endpoints = d['road_ids_to_endpoints']
+    coordinate_routes = np.array(d['coordinate_routes'])
 
     with Timer('sort road ids'):
         sorted_road_ids = np.array(sorted(road_ids_to_endpoints.keys()))
 
-    print("routes=", routes)
-    print("sorted_road_ids=", sorted_road_ids)
+    #print("routes=", routes)
+    #print("sorted_road_ids=", sorted_road_ids)
 
     with Timer('road ids to array'):
         a_road_ids = route_analysis.routes_to_array(routes, sorted_road_ids)
@@ -145,11 +147,9 @@ if __name__ == '__main__':
     with Timer('time features'):
         a_weekdays = np.zeros(shape=(len(routes), 7))
         a_hours = np.zeros(shape=(len(routes), 24))
-        #print(d['departure_times'])
         for i, departure_time in enumerate(d['departure_times']):
             try:
                 dt = datetime.utcfromtimestamp(departure_time)
-                print("dt=", departure_time, dt)
                 a_weekdays[i, dt.weekday()] = 1.0
                 a_hours[i, dt.hour] = 1.0
             except TypeError:
@@ -157,16 +157,18 @@ if __name__ == '__main__':
 
         non_roadid_features = 7 + 24
 
-    print(a_weekdays.shape, a_weekdays)
-    print(a_hours.shape, a_hours)
-    print(a_road_ids.shape, a_road_ids)
+    #print(a_weekdays.shape, a_weekdays)
+    #print(a_hours.shape, a_hours)
+    #print(a_road_ids.shape, a_road_ids)
     #print(a_weekdays.shape, a_hours.shape, a_road_ids.shape)
 
     with Timer('hstack'):
         X = np.hstack((a_weekdays, a_hours, a_road_ids))
 
+
+
     with Timer('PCA'):
-        pca = PCA(n_components=10)
+        pca = PCA(n_components=MAX_COMPONENTS)
         S_pca = pca.fit(X).transform(X)
 
     with Timer('plot PCA'):
@@ -174,8 +176,8 @@ if __name__ == '__main__':
 
     with Timer('ICA'):
         ica = FastICA(
-                max_iter=2000,
-                n_components=10,
+                max_iter=4000,
+                n_components=MAX_COMPONENTS,
                 fun='exp',
                 ) #max_iter=20000,
                 #tol = 0.000001,
@@ -187,7 +189,6 @@ if __name__ == '__main__':
         plots.all_relations(S_ica, '/tmp/ica.pdf')
 
     def render_road_ids(weights, name):
-
         trips = [road_ids_to_endpoints[id_] for id_ in sorted_road_ids]
         trip_weights = weights[non_roadid_features:]
         filename = '/tmp/gmaps_{}.html'.format(name)
@@ -196,11 +197,6 @@ if __name__ == '__main__':
                 gmaps.generate_html_bar_graph(weights[:7], ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']),
                 gmaps.generate_html_bar_graph(weights[7:7+24], [str(i) for i in range(24)]),
                 ]
-
-
-        #info = [ 'WD {}: {:10.8f}'.format(i, mean[i]) for i in range(7) ] \
-                #+ [ 'HR {}: {:10.8f}'.format(i, mean[i + 7]) for i in range(24) ]
-        #)
 
         g = gmaps.generate_gmaps(
                 center = trips[0][0],
@@ -212,9 +208,47 @@ if __name__ == '__main__':
         f.write(g)
         f.close()
 
-    #
+    def cluster_routes(X):
+        metric = route_analysis.route_distance_jaccard
+        #metric = route_analysis.route_distance_h1
+
+        dbscan = DBSCAN(eps = 0.5, metric = metric).fit(X)
+        labels = dbscan.labels_
+        labels_unique = set(labels)
+
+
+        for i in range(10):
+            for j in range(10):
+                print(i, j,
+                        route_analysis.route_distance_jaccard(X[i,:], X[j,:]),
+                        route_analysis.route_distance_h1(X[i,:], X[j,:]))
+
+        colors = plt.cm.Spectral(np.linspace(0, 1, len(labels_unique)))
+
+        print("labels=", labels_unique)
+
+        for k, col in zip(labels_unique, colors):
+            routes = X[labels == k]
+
+            trips = []
+            for route in routes:
+                route = route[24 + 7:]
+                trips.extend( [road_ids_to_endpoints[id_] for id_ in sorted_road_ids[route != 0]] )
+
+            g = gmaps.generate_gmaps(
+                    center = trips[0][0],
+                    trips = trips,
+                    default_color = '#000000' if (k == -1) else rgb2hex(col),
+                    )
+
+            f = open('/tmp/gmaps_dbscan_{}.html'.format(k + 1), 'w')
+            f.write(g)
+            f.close()
+
+    with Timer('cluster'):
+        cluster_routes(X)
+
     # Render mean
-    #
 
     with Timer('gmaps mean'):
         mean = np.average(X, axis=0)

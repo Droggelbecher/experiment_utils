@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import numpy as np
+
 #import matplotlib
 #matplotlib.use('TkAgg')
 
@@ -11,16 +13,18 @@ def all_relations(a, filename):
     """
 
     features = a.shape[1]
-
-    #fig = plt.figure(figsize = (2*features, 2*features), dpi=100)
-    #fig.set_size_inches(1*features, 1*features)
-
     f, axs = plt.subplots(features, features, squeeze=False, sharex=True, sharey=True)
 
-    i = 1
     for row in range(features):
         for column in range(features):
-            axs[row, column].scatter(a[:,column], a[:,row])
+            if column <= row:
+                axs[row, column].scatter(a[:,column], a[:,row], alpha = 0.5, c=np.arange(a.shape[0]))
+            else:
+                axs[row, column].axis('off')
+
+    #plt.autoscale()
+    plt.xlim((np.min(a), np.max(a)))
+    plt.ylim((np.min(a), np.max(a)))
 
     f.set_size_inches((2*features, 2*features))
     f.savefig(filename, dpi=100)

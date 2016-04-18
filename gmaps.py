@@ -38,10 +38,12 @@ def generate_html_bar_graph(heights, names = None):
 def generate_gmaps(
         trips = [],
         trip_weights = [],
+        trip_colors = [],
         markers = [],
         heatmap = [],
         center = (52.495372, 13.461614),
-        info = []
+        info = [],
+        default_color = '#000000'
         ):
     """
     trips: iterable over iterable of (lat, lon) pairs
@@ -57,28 +59,28 @@ def generate_gmaps(
         ...
         ]
     """
+    
+    if not len(trip_colors):
+        trip_colors = [default_color] * len(trips)
 
-    tw_min = min(trip_weights)
-    tw_max = max(trip_weights)
+    trip_strokes = [2] * len(trips)
 
-    trip_colors = ['#000000'] * len(trips)
-    trip_strokes = [0] * len(trips)
+    tw_min = 0
+    tw_max = 1
+    if len(trip_weights):
+        tw_min = min(trip_weights)
+        tw_max = max(trip_weights)
 
-    for i, w in enumerate(trip_weights):
-        #w_rel = ((w - tw_min) / (tw_max - tw_min))
-        #green = 255 if w_rel > .5 else int(255 * 2 * w_rel)
-        #red = 255 if w_rel < .5 else int(255 * 2 * (1.0 - w_rel))
-        #trip_colors[i] = '#{:02X}{:02X}00'.format(red, green)
+        for i, w in enumerate(trip_weights):
+            if w > 0:
+                trip_colors[i] = '#00FF00'
+                w_rel = w / tw_max
+                trip_strokes[i] = int(10.0 * w_rel)
 
-        if w > 0:
-            trip_colors[i] = '#00FF00'
-            w_rel = w / tw_max
-            trip_strokes[i] = int(10.0 * w_rel)
-
-        elif w < 0:
-            trip_colors[i] = '#FF0000'
-            w_rel = w / tw_min
-            trip_strokes[i] = int(10.0 * w_rel)
+            elif w < 0:
+                trip_colors[i] = '#FF0000'
+                w_rel = w / tw_min
+                trip_strokes[i] = int(10.0 * w_rel)
 
 
     r = '''

@@ -30,6 +30,21 @@ def routes_to_array(routes, ids):
                     break
     return a
 
+
+def route_distance_jaccard(a, b):
+    """
+    a, b: routes in as 1-d np arrays of 0/1 values
+    """
+    intersection = np.count_nonzero(a * b)
+    union = np.count_nonzero(a + b)
+    return 1.0 - float(intersection) / float(union)
+
+def route_distance_h1(a, b):
+
+    intersection = np.count_nonzero(a * b)
+    return 1.0 - float(intersection) / float(min(np.count_nonzero(a), np.count_nonzero(b)))
+
+
 def roadid_covariance_matrix(routes):
     """
     routes: iterable over (iterarable over road ids)
@@ -71,9 +86,6 @@ def roadid_covariance_matrix(routes):
 
             covariance[i, i + j] = c
             covariance[i + j, i] = c
-
-            #if j != 0 and covariance[i, i + j] != 0:
-                #print (i, j, covariance[i, i + j])
 
     return (all_road_ids, means, covariance)
 
