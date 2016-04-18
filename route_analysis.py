@@ -44,6 +44,33 @@ def route_distance_h1(a, b):
     intersection = np.count_nonzero(a * b)
     return 1.0 - float(intersection) / float(min(np.count_nonzero(a), np.count_nonzero(b)))
 
+#def route_distance_leveshtein(a, b):
+
+    # Makes no sense with the set-based view on routes!
+
+
+    #if len(a) > len(b):
+        #return route_distance_leveshtein(b, a)
+
+    ## len(a) <= len(b)
+    
+    #if len(a) == 0:
+        #return len(b) # insert b completely
+
+
+    ## d[i, j] = lev(a[:i], b[:j])
+    ##
+    #d = np.zeros((len(a) + 1, len(b) + 1))
+    
+    ## a->empty: delete all characters
+    #d[:, 0] = np.arange(len(a) + 1)
+
+    ## empty->b: insert all characters
+    #d[0, :] = np.arange(len(b) + 1)
+
+
+
+
 
 def roadid_covariance_matrix(routes):
     """

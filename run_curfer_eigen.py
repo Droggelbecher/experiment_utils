@@ -212,7 +212,7 @@ if __name__ == '__main__':
         metric = route_analysis.route_distance_jaccard
         #metric = route_analysis.route_distance_h1
 
-        dbscan = DBSCAN(eps = 0.5, metric = metric).fit(X)
+        dbscan = DBSCAN(eps = 0.3, metric = metric).fit(X)
         labels = dbscan.labels_
         labels_unique = set(labels)
 
@@ -238,7 +238,7 @@ if __name__ == '__main__':
             g = gmaps.generate_gmaps(
                     center = trips[0][0],
                     trips = trips,
-                    default_color = '#000000' if (k == -1) else rgb2hex(col),
+                    default_color = '#ff00ff',
                     )
 
             f = open('/tmp/gmaps_dbscan_{}.html'.format(k + 1), 'w')

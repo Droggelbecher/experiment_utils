@@ -13,14 +13,19 @@ def all_relations(a, filename):
     """
 
     features = a.shape[1]
-    f, axs = plt.subplots(features, features, squeeze=False, sharex=True, sharey=True)
+    f, axs = plt.subplots(features - 1, features - 1, squeeze=False, sharex=True, sharey=True)
 
-    for row in range(features):
-        for column in range(features):
-            if column <= row:
-                axs[row, column].scatter(a[:,column], a[:,row], alpha = 0.5, c=np.arange(a.shape[0]))
+    for row in range(1, features):
+        for column in range(features - 1):
+            if column < row:
+                axs[row - 1, column].scatter(a[:,column], a[:,row], alpha = 0.5, c=np.arange(a.shape[0]))
+                axs[row - 1, column].set_xlabel(str(column))
+                axs[row - 1, column].set_ylabel(str(row))
+                axs[row - 1, column].get_xaxis().set_ticks([])
+                axs[row - 1, column].get_yaxis().set_ticks([])
             else:
-                axs[row, column].axis('off')
+                axs[row - 1, column].axis('off')
+
 
     #plt.autoscale()
     plt.xlim((np.min(a), np.max(a)))
