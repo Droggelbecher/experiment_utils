@@ -110,6 +110,7 @@ def preprocess_data(curfer_directory):
 def render_road_ids(r, weights, name):
     trips = r.endpoints
     trip_weights = r.F.route(weights)
+    arrival_weights = r.F.arrival_arcs(weights) * 10.0
     filename = '/tmp/gmaps_{}.html'.format(name)
 
     info = [
@@ -117,10 +118,15 @@ def render_road_ids(r, weights, name):
             gmaps.generate_html_bar_graph(r.F.hours(weights), r.F.hours.keys),
             ]
 
+    #print("tripss", trips.shape)
+    #print(np.hstack((trip_weights, arrival_weights)).shape)
+    #print("weights", trip_weights.shape)
+
     g = gmaps.generate_gmaps(
             center = trips[0][0],
-            trips = trips,
-            trip_weights = trip_weights,
+            trips = np.vstack((trips, trips)),
+            trip_weights = np.hstack((trip_weights, arrival_weights)),
+            trip_colors = [None] * len(trip_weights) + ['#ffffff'] * len(trip_weights),
             info = info)
 
     f = open(filename, 'w')
@@ -131,13 +137,7 @@ def render_road_ids(r, weights, name):
 def cluster_routes(r):
     metric = r.distance_jaccard
 
-    #def metric(a, b):
-        ## Seems we cannot provide r.distance_jaccard directly as a callable
-        ## to DBSCAN, it seems to give us weird parameters then
-        #return r.distance_jaccard(a, b)
-
-    #print("XX.s=", r.X.shape)
-    print('r.X=', r.X)
+    print('r.X=', r.X.shape)
     dbscan = DBSCAN(eps = 0.5, metric = metric).fit(r.X)
     labels = dbscan.labels_
     labels_unique = set(labels)
@@ -242,6 +242,7 @@ if __name__ == '__main__':
         components = pca.components_.T
         for i in range(min(MAX_COMPONENTS, components.shape[1])):
             component = components[:,i]
+            print(component)
             render_road_ids(r, component, 'pc_{}'.format(i))
 
     # Render independent components

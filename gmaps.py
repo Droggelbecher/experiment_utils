@@ -64,28 +64,42 @@ def generate_gmaps(
         ...
         ]
     """
+
+    #print("trips", len(trips))
+    #print("trip_weights", len(trip_weights))
+    #print("trip_colors", len(trip_colors))
     
     if not len(trip_colors):
-        trip_colors = [default_color] * len(trips)
+        trip_colors = [None] * len(trips)
 
     trip_strokes = [4] * len(trips)
 
     tw_min = 0
     tw_max = 1
     if len(trip_weights):
+        trip_strokes = [0] * len(trips)
+
         tw_min = min(trip_weights)
         tw_max = max(trip_weights)
 
         for i, w in enumerate(trip_weights):
             if w > 0:
-                trip_colors[i] = '#00FF00'
+                if trip_colors[i] is None:
+                    trip_colors[i] = '#00FF00'
                 w_rel = w / tw_max
                 trip_strokes[i] = int(10.0 * w_rel)
 
             elif w < 0:
-                trip_colors[i] = '#FF0000'
+                if trip_colors[i] is None:
+                    trip_colors[i] = '#FF0000'
+                else:
+                    trip_colors[i] = default_color
                 w_rel = w / tw_min
                 trip_strokes[i] = int(10.0 * w_rel)
+
+    for i in range(len(trip_colors)):
+        if trip_colors[i] is None:
+            trip_colors[i] = default_color
 
 
     r = '''

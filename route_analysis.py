@@ -34,7 +34,8 @@ class Routes:
                 Feature('hours',     np.arange(0, 24, 0.5),                      weight = 0.0),
                 Feature('arrival',   ('lat', 'lon'),                             weight = 0.2),
                 Feature('departure', ('lat', 'lon'),                             weight = 0.0),
-                Feature('route',     sorted_road_ids,                            weight = 0.8)
+                Feature('route',     sorted_road_ids,                            weight = 0.8),
+                Feature('arrival_arcs', sorted_road_ids,                         weight = 0.0),
                 )
 
         self.endpoints = np.array([road_ids_to_endpoints[id_] for id_ in sorted_road_ids])
@@ -63,8 +64,8 @@ class Routes:
             except TypeError:
                 pass
 
-        self.sorted_road_ids = sorted_road_ids
-        a_road_ids = routes_to_array(routes, sorted_road_ids)
+        #self.sorted_road_ids = sorted_road_ids
+        a_road_ids, a_arrival_arcs = routes_to_array(routes, sorted_road_ids)
 
         # TODO: this needs to stay consistent with the offsets above
         self.X = np.hstack((
@@ -72,7 +73,8 @@ class Routes:
             a_hours,
             a_arrival,
             a_departure,
-            a_road_ids
+            a_road_ids,
+            a_arrival_arcs
             ))
 
     @staticmethod
@@ -99,7 +101,6 @@ class Routes:
         if len(r1) == self.X.shape[1]:
             nr = self._nonroute_dist(r1, r2) 
             j = Routes._jaccard_dist(self.F.route(r1), self.F.route(r2)) * self.F.route.weight
-            print('dist=', nr, j, nr + j)
             return nr + j
         else:
             return 0.0
@@ -114,6 +115,7 @@ def routes_to_array(routes, ids):
     """
     #a = scipy.sparse.lil_matrix(0, (len(routes), len(ids)), dtype=np.bool_)
     a = np.zeros(shape=(len(routes), len(ids)))
+    a_arrival = np.zeros(shape=(len(routes), len(ids)))
 
     for i, route in enumerate(routes):
         for r in route:
@@ -122,7 +124,10 @@ def routes_to_array(routes, ids):
                 if id_ == r:
                     a[i, j] = 1
                     break
-    return a
+        for j, id_ in enumerate(ids):
+            if id_ == route[-1]:
+                a_arrival[i, j] = 1
+    return a, a_arrival
 
 
 
