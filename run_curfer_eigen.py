@@ -117,7 +117,7 @@ def render_road_ids(r, weights, name):
 
     lines = itertools.chain(
                 gmaps.weighted_lines(r.F.route(weights), r.endpoints),
-                gmaps.weighted_lines(r.F.arrival_arcs(weights), r.endpoints, '#ffffff', '#000000')
+                gmaps.weighted_lines(r.F.arrival_arcs(weights), r.endpoints, '#ff00ff', '#000000', opacity = 1.0)
                 )
 
     g = gmaps.generate_gmaps(

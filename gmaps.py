@@ -41,9 +41,7 @@ def generate_html_bar_graph(heights, names = None):
 
     return r
 
-def weighted_lines(weights, endpoints, color_pos = '#00ff00', color_neg = '#ff0000'):
-    opacity = 0.8
-
+def weighted_lines(weights, endpoints, color_pos = '#00ff00', color_neg = '#ff0000', opacity = 0.5):
     min_weight = min(weights)
     max_weight = max(weights)
 
