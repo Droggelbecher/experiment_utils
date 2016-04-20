@@ -6,3 +6,4 @@ log.txt
 *.ttp
 tracking_pb2.py
 *.swp
+.DS_Store
