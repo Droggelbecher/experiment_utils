@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 
 import json
+import matplotlib.pyplot as plt
+from matplotlib.colors import rgb2hex
+import numpy as np
 
 
 def generate_html_bar_graph(heights, names = None):
@@ -38,11 +41,49 @@ def generate_html_bar_graph(heights, names = None):
 
     return r
 
+def weighted_lines(weights, endpoints, color_pos = '#00ff00', color_neg = '#ff0000'):
+    opacity = 0.8
+
+    min_weight = min(weights)
+    max_weight = max(weights)
+
+    for w, (from_, to) in zip(weights, endpoints):
+        color = color_pos
+        w_rel = 0
+        if w > 0:
+            w_rel = w / max_weight
+        elif min_weight < 0:
+            w_rel = w / min_weight
+            color = color_neg
+
+        yield {
+                'path': [ { 'lat': from_[0], 'lng': from_[1] }, { 'lat': to[0], 'lng': to[1] } ],
+                'strokeColor': color,
+                'strokeOpacity': opacity,
+                'strokeWeight': int(10.0*w_rel),
+                }
+
+def line_sets(ll):
+    """
+    ll = [
+             [((lat, lon), (lat, lon)), ((lat, lon), (lat, lon))],
+             ...
+         ]
+    """
+    ll = list(ll)
+    for line_set, c in zip(ll, plt.cm.Spectral(np.linspace(0, 1, len(ll)))):
+        for (from_, to) in line_set:
+            yield {
+                    'path': [ { 'lat': from_[0], 'lng': from_[1] }, { 'lat': to[0], 'lng': to[1] } ],
+                    'strokeColor': rgb2hex(c),
+                    'strokeWeight': 4,
+                    'strokeOpacity': 0.8,
+                  }
+
+
 
 def generate_gmaps(
-        trips = [],
-        trip_weights = [],
-        trip_colors = [],
+        lines = [],
         markers = [],
         heatmap = [],
         circles = [],
@@ -50,58 +91,7 @@ def generate_gmaps(
         info = [],
         default_color = '#000000'
         ):
-    """
-    trips: iterable over iterable of (lat, lon) pairs
-
-    eg: trips = [
-            [ (1,2), (3,4), (5,6) ],
-            [ (100, 100), (101, 102), (101, 103), (102, 100) ],
-            ...
-        ]
-
-    heatmap = [
-        (lat, long, v),
-        ...
-        ]
-    """
-
-    #print("trips", len(trips))
-    #print("trip_weights", len(trip_weights))
-    #print("trip_colors", len(trip_colors))
     
-    if not len(trip_colors):
-        trip_colors = [None] * len(trips)
-
-    trip_strokes = [4] * len(trips)
-
-    tw_min = 0
-    tw_max = 1
-    if len(trip_weights):
-        trip_strokes = [0] * len(trips)
-
-        tw_min = min(trip_weights)
-        tw_max = max(trip_weights)
-
-        for i, w in enumerate(trip_weights):
-            if w > 0:
-                if trip_colors[i] is None:
-                    trip_colors[i] = '#00FF00'
-                w_rel = w / tw_max
-                trip_strokes[i] = int(10.0 * w_rel)
-
-            elif w < 0:
-                if trip_colors[i] is None:
-                    trip_colors[i] = '#FF0000'
-                else:
-                    trip_colors[i] = default_color
-                w_rel = w / tw_min
-                trip_strokes[i] = int(10.0 * w_rel)
-
-    for i in range(len(trip_colors)):
-        if trip_colors[i] is None:
-            trip_colors[i] = default_color
-
-
     r = '''
 <!DOCTYPE html>
 <html>
@@ -112,7 +102,7 @@ def generate_gmaps(
 
 var center = new google.maps.LatLng({}, {});
 
-var trips = [
+var lines = [
     {}
     ];
 
@@ -124,37 +114,45 @@ var heatmap = [
     {}
     ];
 
-var trip_colors = [
-    {}
-    ];
-
-var trip_strokes = [
-    {}
-    ];
-
 var circles = [
     {}
     ];
+
+var customMapType = new google.maps.StyledMapType([
+      {{
+        stylers: [
+          {{visibility: 'simplified'}},
+          {{gamma: 0.9}},
+          {{weight: 0.5}},
+          {{saturation: 0.01}}
+        ]
+      }},
+      {{
+        elementType: 'labels',
+        stylers: [{{visibility: 'off'}}]
+      }}
+    ], {{
+      name: 'Custom Style'
+  }});
+var customMapTypeId = 'custom_style';
 
 function initialize()
 {{
     var mapProp = {{
         center: center,
         zoom: 13,
-        mapTypeId: google.maps.MapTypeId.SATELLITE
+        mapTypeControlOptions: {{
+            mapTypeIds: [google.maps.MapTypeId.ROADMAP, customMapTypeId]
+            }}
     }};
-      
+
     var map = new google.maps.Map(document.getElementById("googleMap"),mapProp);
+    map.mapTypes.set(customMapTypeId, customMapType);
+    map.setMapTypeId(customMapTypeId);
+      
 
-    for(var i = 0; i < trips.length; i++) {{
-        var flightPath=new google.maps.Polyline({{
-          path: trips[i],
-          strokeColor: trip_colors[i],
-          strokeOpacity: 0.8,
-          strokeWeight: trip_strokes[i]
-          }});
-
-        flightPath.setMap(map);
+    for(var i = 0; i < lines.length; i++) {{
+        lines[i].setMap(map);
     }}
 
     for(var i = 0; i < markers.length; i++) {{
@@ -185,28 +183,16 @@ google.maps.event.addDomListener(window, 'load', initialize);
 <body>
 <div id="googleMap" style="width:1000px;height:800px;"></div>
 
-Min. weight: {}<br />
-Max. weight: {}<br />
 {}
 
 </body>
 </html>
 '''.format(
         center[0], center[1],
-        ',\n'.join('['
-            + ',\n  '.join(('new google.maps.LatLng({}, {})'.format(t[0], t[1]) for t in trip))
-            + ']' for trip in trips),
+        ',\n'.join('new google.maps.Polyline({})'.format(json.dumps(l)) for l in lines),
         ',\n'.join('new google.maps.LatLng({}, {})'.format(lat, lon) for (lat, lon) in markers),
         ',\n'.join('{{location: new google.maps.LatLng({}, {}), weight: {:.8f} }}'.format(lat, lon, float(w)) for (lat, lon, w) in heatmap),
-        ','.join('"{}"'.format(c) for c in trip_colors),
-        ','.join('{}'.format(c) for c in trip_strokes),
         ','.join('new google.maps.Circle({})'.format(json.dumps(c)) for c in circles),
-            
-            
-            #'{{ center: {{ lat: {}, lng: {} }}, r: {} }}'.format(*c) for c in circles),
-
-        tw_min,
-        tw_max,
         '<br />\n'.join(info)
         )
 

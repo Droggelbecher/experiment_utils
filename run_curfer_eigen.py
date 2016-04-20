@@ -6,12 +6,12 @@ import os.path
 import shutil
 import subprocess
 import math
+import itertools
 
 from mpl_toolkits.mplot3d import Axes3D
 from sklearn.cluster import DBSCAN
 from sklearn.decomposition import PCA, FastICA
 import matplotlib.pyplot as plt
-from matplotlib.colors import rgb2hex
 import numpy as np
 import numpy.linalg as LA
 
@@ -108,9 +108,6 @@ def preprocess_data(curfer_directory):
             }
 
 def render_road_ids(r, weights, name):
-    trips = r.endpoints
-    trip_weights = r.F.route(weights)
-    arrival_weights = r.F.arrival_arcs(weights) * 10.0
     filename = '/tmp/gmaps_{}.html'.format(name)
 
     info = [
@@ -118,15 +115,14 @@ def render_road_ids(r, weights, name):
             gmaps.generate_html_bar_graph(r.F.hours(weights), r.F.hours.keys),
             ]
 
-    #print("tripss", trips.shape)
-    #print(np.hstack((trip_weights, arrival_weights)).shape)
-    #print("weights", trip_weights.shape)
+    lines = itertools.chain(
+                gmaps.weighted_lines(r.F.route(weights), r.endpoints),
+                gmaps.weighted_lines(r.F.arrival_arcs(weights), r.endpoints, '#ffffff', '#000000')
+                )
 
     g = gmaps.generate_gmaps(
-            center = trips[0][0],
-            trips = np.vstack((trips, trips)),
-            trip_weights = np.hstack((trip_weights, arrival_weights)),
-            trip_colors = [None] * len(trip_weights) + ['#ffffff'] * len(trip_weights),
+            center = r.endpoints[0][0],
+            lines = lines,
             info = info)
 
     f = open(filename, 'w')
@@ -154,18 +150,19 @@ def cluster_routes(r):
     for k in labels_unique:
         routes = r.X[labels == k]
 
-        trips = []
-        trip_colors = []
-        colors = plt.cm.Spectral(np.linspace(0, 1, len(routes)))
+        line_sets = gmaps.line_sets((r.endpoints[r.F.route(route) != 0] for route in routes))
+
+
+        #colors = plt.cm.Spectral(np.linspace(0, 1, len(routes)))
 
         weights = np.zeros(r.X.shape[1])
 
-        for c,route in zip(colors, routes):
+        for route in routes:
             weights += route
-            route = r.F.route(route)
-            ep = r.endpoints[route != 0]
-            trips.extend(ep)
-            trip_colors.extend([rgb2hex(c)] * len(ep))
+            #route = r.F.route(route)
+            #ep = r.endpoints[route != 0]
+            #trips.extend(ep)
+            #trip_colors.extend([rgb2hex(c)] * len(ep))
 
         weights /= len(routes)
 
@@ -173,26 +170,24 @@ def cluster_routes(r):
         departure_radius = max(geo.distance(r.F.departure(row), r.F.departure(weights)) for row in routes)
 
         g = gmaps.generate_gmaps(
-                center = trips[0][0],
-                trips = trips,
-                trip_colors = trip_colors,
-                default_color = '#ff00ff',
+                center = r.endpoints[0][0],
+                lines = line_sets,
                 markers = [ r.F.arrival(weights) ],
                 circles = [
                     {
                         'center': { 'lat': weights[r.F.arrival.start], 'lng': weights[r.F.arrival.start+1] },
                         'radius': arrival_radius,
-                        'strokeColor': '#ff0000',
+                        'strokeColor': '#ffffff',
                     },
                     {
                         'center': { 'lat': weights[r.F.departure.start], 'lng': weights[r.F.departure.start+1] },
                         'radius': departure_radius,
-                        'strokeColor': '#00ff00',
+                        'strokeColor': '#000000',
                     }],
                 info = [
                     '# routes: {}'.format(len(routes)),
-                    'departure radius (green): {}'.format(departure_radius),
-                    'arrival radius (red): {}'.format(arrival_radius),
+                    'departure radius (black): {}'.format(departure_radius),
+                    'arrival radius (white): {}'.format(arrival_radius),
                     gmaps.generate_html_bar_graph(r.F.weekdays(weights), r.F.weekdays.keys),
                     gmaps.generate_html_bar_graph(r.F.hours(weights),    r.F.hours.keys),
                     ]
@@ -242,7 +237,6 @@ if __name__ == '__main__':
         components = pca.components_.T
         for i in range(min(MAX_COMPONENTS, components.shape[1])):
             component = components[:,i]
-            print(component)
             render_road_ids(r, component, 'pc_{}'.format(i))
 
     # Render independent components
