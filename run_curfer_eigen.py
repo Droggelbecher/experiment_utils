@@ -6,7 +6,6 @@ import os.path
 import shutil
 import subprocess
 import math
-from datetime import datetime
 
 from mpl_toolkits.mplot3d import Axes3D
 from sklearn.cluster import DBSCAN
@@ -27,60 +26,13 @@ import route_analysis
 import ttp
 import geo
 
-np.set_printoptions(threshold=99999,linewidth=99999,precision=3)
+np.set_printoptions(threshold=9999999999,linewidth=99999,precision=3)
 
 
 GPS_TTP_FILENAME = '/tmp/gps.ttp'
 MAX_COMPONENTS = 10
 
 
-
-class Routes:
-    def __init__(self, d):
-        routes = d['routes']
-        road_ids_to_endpoints = d['road_ids_to_endpoints']
-        coordinate_routes = d['coordinate_routes']
-        sorted_road_ids = np.array(sorted(road_ids_to_endpoints.keys()))
-        self.endpoints = np.array([road_ids_to_endpoints[id_] for id_ in sorted_road_ids])
-
-        a_arrival = np.array([c[-1] for c in coordinate_routes])
-        a_departure = np.array([c[0] for c in coordinate_routes])
-
-        # Positions of stuff in X (columns=features)
-
-        p = 0
-        self.weekdays_start = p; p += 7;
-        self.weekdays_end = p
-        self.hours_start = p; p += 24
-        self.hours_end = p
-        self.arrival_start = p; p+= 2
-        self.arrival_end = p
-        self.departure_start = p; p+= 2
-        self.departure_end = p
-
-        self.routes_start = p
-
-        # Departure Time
-
-        a_weekdays = np.zeros(shape=(len(routes), 7))
-        a_hours = np.zeros(shape=(len(routes), 24))
-        for i, departure_time in enumerate(d['departure_times']):
-            try:
-                dt = datetime.utcfromtimestamp(departure_time)
-                a_weekdays[i, dt.weekday()] = 1.0
-                a_hours[i, dt.hour] = 1.0
-            except TypeError:
-                pass
-
-        self.sorted_road_ids = sorted_road_ids
-        a_road_ids = route_analysis.routes_to_array(routes, sorted_road_ids)
-        self.X = np.hstack((
-            a_weekdays,
-            a_hours,
-            a_arrival,
-            a_departure,
-            a_road_ids
-            ))
 
 
 @cached(filename_kws = ['curfer_filename'])
@@ -157,12 +109,12 @@ def preprocess_data(curfer_directory):
 
 def render_road_ids(r, weights, name):
     trips = r.endpoints
-    trip_weights = weights[r.routes_start:]
+    trip_weights = r.F.route(weights)
     filename = '/tmp/gmaps_{}.html'.format(name)
 
     info = [
-            gmaps.generate_html_bar_graph(weights[:r.weekdays_end], ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']),
-            gmaps.generate_html_bar_graph(weights[r.hours_start:r.hours_end], [str(i) for i in range(24)]),
+            gmaps.generate_html_bar_graph(r.F.weekdays(weights), r.F.weekdays.keys),
+            gmaps.generate_html_bar_graph(r.F.hours(weights), r.F.hours.keys),
             ]
 
     g = gmaps.generate_gmaps(
@@ -177,10 +129,16 @@ def render_road_ids(r, weights, name):
 
 
 def cluster_routes(r):
-    metric = route_analysis.route_distance_jaccard
-    #metric = route_analysis.route_distance_h1
+    metric = r.distance_jaccard
 
-    dbscan = DBSCAN(eps = 0.4, metric = metric).fit(r.X)
+    #def metric(a, b):
+        ## Seems we cannot provide r.distance_jaccard directly as a callable
+        ## to DBSCAN, it seems to give us weird parameters then
+        #return r.distance_jaccard(a, b)
+
+    #print("XX.s=", r.X.shape)
+    print('r.X=', r.X)
+    dbscan = DBSCAN(eps = 0.5, metric = metric).fit(r.X)
     labels = dbscan.labels_
     labels_unique = set(labels)
 
@@ -204,32 +162,30 @@ def cluster_routes(r):
 
         for c,route in zip(colors, routes):
             weights += route
-            route = route[r.routes_start:]
+            route = r.F.route(route)
             ep = r.endpoints[route != 0]
             trips.extend(ep)
             trip_colors.extend([rgb2hex(c)] * len(ep))
 
         weights /= len(routes)
 
-        arrival_radius = max(geo.distance(row[r.arrival_start], row[r.arrival_start + 1],
-            weights[r.arrival_start], weights[r.arrival_start + 1]) for row in routes)
-        departure_radius = max(geo.distance(row[r.departure_start], row[r.departure_start + 1],
-            weights[r.departure_start], weights[r.departure_start + 1]) for row in routes)
+        arrival_radius = max(geo.distance(r.F.arrival(row), r.F.arrival(weights)) for row in routes)
+        departure_radius = max(geo.distance(r.F.departure(row), r.F.departure(weights)) for row in routes)
 
         g = gmaps.generate_gmaps(
                 center = trips[0][0],
                 trips = trips,
                 trip_colors = trip_colors,
                 default_color = '#ff00ff',
-                markers = [ weights[r.arrival_start:r.arrival_start+2] ],
+                markers = [ r.F.arrival(weights) ],
                 circles = [
                     {
-                        'center': { 'lat': weights[r.arrival_start], 'lng': weights[r.arrival_start+1] },
+                        'center': { 'lat': weights[r.F.arrival.start], 'lng': weights[r.F.arrival.start+1] },
                         'radius': arrival_radius,
                         'strokeColor': '#ff0000',
                     },
                     {
-                        'center': { 'lat': weights[r.departure_start], 'lng': weights[r.departure_start+1] },
+                        'center': { 'lat': weights[r.F.departure.start], 'lng': weights[r.F.departure.start+1] },
                         'radius': departure_radius,
                         'strokeColor': '#00ff00',
                     }],
@@ -237,8 +193,8 @@ def cluster_routes(r):
                     '# routes: {}'.format(len(routes)),
                     'departure radius (green): {}'.format(departure_radius),
                     'arrival radius (red): {}'.format(arrival_radius),
-                    gmaps.generate_html_bar_graph(weights[:r.weekdays_end], ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']),
-                    gmaps.generate_html_bar_graph(weights[r.hours_start:r.hours_end], [str(i) for i in range(24)]),
+                    gmaps.generate_html_bar_graph(r.F.weekdays(weights), r.F.weekdays.keys),
+                    gmaps.generate_html_bar_graph(r.F.hours(weights),    r.F.hours.keys),
                     ]
                 )
 
@@ -251,7 +207,7 @@ def cluster_routes(r):
 if __name__ == '__main__':
     d = preprocess_data(sys.argv[1])
 
-    r = Routes(d)
+    r = route_analysis.Routes(d)
 
     with Timer('PCA'):
         pca = PCA(n_components=MAX_COMPONENTS)

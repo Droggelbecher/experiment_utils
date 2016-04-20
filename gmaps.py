@@ -4,8 +4,10 @@ import json
 
 
 def generate_html_bar_graph(heights, names = None):
-    width = len(heights) * 24
+    w = 30
     height = 100
+
+    width = len(heights) * (w + 4)
 
     min_ = min(heights)
     max_ = max(heights)
@@ -16,20 +18,20 @@ def generate_html_bar_graph(heights, names = None):
 
     r += '<div style="width: {}px; height: {}px; border: 1px solid #a0a0a0">'.format(width, height)
     for h in hs:
-        r += '<div style="height: {}px; width: 20px; margin: 2px; display: inline-block; position: relative; background-color: #00ff00; vertical-align: baseline;"></div>'.format(h if h > 0 else 0)
+        r += '<div style="height: {}px; width: {}px; margin: 2px; display: inline-block; position: relative; background-color: #00ff00; vertical-align: baseline;"></div>'.format(h if h > 0 else 0, w)
     r += '</div>'
 
     if min_ < 0:
         r += '<div style="width: {}px; height: {}px; border: 1px solid #a0a0a0">'.format(width, height)
         for h in hs:
-            r += '<div style="height: {}px; width: 20px; margin: 2px; display: inline-block; position: relative; background-color: #ff0000; vertical-align: top;"></div>'.format(-h if h < 0 else 0)
+            r += '<div style="height: {}px; width: {}px; margin: 2px; display: inline-block; position: relative; background-color: #ff0000; vertical-align: top;"></div>'.format(-h if h < 0 else 0, w)
         r += '</div>'
 
 
     if names is not None:
         r += '<div style="width: {}px; border: 1px solid #a0a0a0">'.format(width)
         for name in names:
-            r += '<div style="width: 20px; margin: 2px; display: inline-block; position: relative; vertical-align: baseline;">{}</div>'.format(name)
+            r += '<div style="width: {}px; margin: 2px; display: inline-block; position: relative; vertical-align: baseline;">{}</div>'.format(w, name)
         r += '</div>'
 
     r += '<br />Min: {}<br />Max: {}'.format(min_, max_)

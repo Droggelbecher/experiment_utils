@@ -5,10 +5,104 @@ import scipy
 import scipy.sparse
 import csv
 import sys
-
+from datetime import datetime
+import math
 from collections import Counter
 
+from features import Features, Feature
+import geo
+
 csv.field_size_limit(sys.maxsize)
+
+class Routes:
+
+    # TODO: Having a fixed max distance is probably not so good (as it gives a strong bias to the distance metric),
+    # rather try scaling to the max distance in the dataset?
+
+    # in m, used for distance between eg. 2 destinations
+    MAX_CONCEIVABLE_DISTANCE = 10*1000
+
+    def __init__(self, d):
+        routes = d['routes']
+        road_ids_to_endpoints = d['road_ids_to_endpoints']
+        coordinate_routes = d['coordinate_routes']
+
+        sorted_road_ids = np.array(sorted(road_ids_to_endpoints.keys()))
+
+        self.F = Features(
+                Feature('weekdays',  ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'], weight = 0.0),
+                Feature('hours',     np.arange(0, 24, 0.5),                      weight = 0.0),
+                Feature('arrival',   ('lat', 'lon'),                             weight = 0.2),
+                Feature('departure', ('lat', 'lon'),                             weight = 0.0),
+                Feature('route',     sorted_road_ids,                            weight = 0.8)
+                )
+
+        self.endpoints = np.array([road_ids_to_endpoints[id_] for id_ in sorted_road_ids])
+
+        a_arrival = np.array([c[-1] for c in coordinate_routes])
+        a_departure = np.array([c[0] for c in coordinate_routes])
+
+        # Departure Time
+
+        a_weekdays = np.zeros(shape=(len(routes), 7))
+        a_hours = np.zeros(shape=(len(routes), len(self.F.hours)))
+        for i, departure_time in enumerate(d['departure_times']):
+            try:
+                dt = datetime.utcfromtimestamp(departure_time)
+                a_weekdays[i, dt.weekday()] = 1.0
+
+                # Flag a '1' for all hour-categories that match.
+                # Each category is a centered range of length 1hr around each
+                # key, if eg. the resolution is 30min, there is always 2
+                # overlapping
+
+                for j, key in enumerate(self.F.hours.keys):
+                    if abs(key - dt.hour) < 1.0:
+                        a_hours[i, j] = 1.0
+
+            except TypeError:
+                pass
+
+        self.sorted_road_ids = sorted_road_ids
+        a_road_ids = routes_to_array(routes, sorted_road_ids)
+
+        # TODO: this needs to stay consistent with the offsets above
+        self.X = np.hstack((
+            a_weekdays,
+            a_hours,
+            a_arrival,
+            a_departure,
+            a_road_ids
+            ))
+
+    @staticmethod
+    def _jaccard_dist(a, b):
+        intersection = np.sum(a * b)
+        union = np.sum(a + b)
+        return 1.0 - float(intersection) / float(union)
+
+
+    def _nonroute_dist(self, a, b):
+        dist_hours = abs(self.F.hours.b_mean(a) - self.F.hours.b_mean(b)) / 24.0
+        dist_weekdays = 0.0 if np.all(self.F.weekdays(a) == self.F.weekdays(b)) else 1.0
+        dist_arrival = geo.distance(self.F.arrival(a), self.F.arrival(b)) / self.MAX_CONCEIVABLE_DISTANCE
+        dist_arrival = min(dist_arrival, 1.0)
+        dist_departure = geo.distance(self.F.departure(a), self.F.departure(b)) / self.MAX_CONCEIVABLE_DISTANCE
+        dist_departure = min(dist_departure, 1.0)
+
+        return (dist_hours * self.F.hours.weight
+                + dist_weekdays * self.F.weekdays.weight
+                + dist_arrival * self.F.arrival.weight
+                + dist_departure * self.F.departure.weight)
+
+    def distance_jaccard(self, r1, r2):
+        if len(r1) == self.X.shape[1]:
+            nr = self._nonroute_dist(r1, r2) 
+            j = Routes._jaccard_dist(self.F.route(r1), self.F.route(r2)) * self.F.route.weight
+            print('dist=', nr, j, nr + j)
+            return nr + j
+        else:
+            return 0.0
 
 def routes_to_array(routes, ids):
     """
@@ -29,45 +123,6 @@ def routes_to_array(routes, ids):
                     a[i, j] = 1
                     break
     return a
-
-
-def route_distance_jaccard(a, b):
-    """
-    a, b: routes in as 1-d np arrays of 0/1 values
-    """
-    intersection = np.count_nonzero(a * b)
-    union = np.count_nonzero(a + b)
-    return 1.0 - float(intersection) / float(union)
-
-def route_distance_h1(a, b):
-
-    intersection = np.count_nonzero(a * b)
-    return 1.0 - float(intersection) / float(min(np.count_nonzero(a), np.count_nonzero(b)))
-
-#def route_distance_leveshtein(a, b):
-
-    # Makes no sense with the set-based view on routes!
-
-
-    #if len(a) > len(b):
-        #return route_distance_leveshtein(b, a)
-
-    ## len(a) <= len(b)
-    
-    #if len(a) == 0:
-        #return len(b) # insert b completely
-
-
-    ## d[i, j] = lev(a[:i], b[:j])
-    ##
-    #d = np.zeros((len(a) + 1, len(b) + 1))
-    
-    ## a->empty: delete all characters
-    #d[:, 0] = np.arange(len(a) + 1)
-
-    ## empty->b: insert all characters
-    #d[0, :] = np.arange(len(b) + 1)
-
 
 
 
