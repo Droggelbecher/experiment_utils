@@ -150,7 +150,10 @@ def clear_caches():
     except FileNotFoundError:
         pass
 
-def cached(filename_kws=(), ignore_kws=(), add_filenames=(), cache_if=lambda kws: True):
+ALWAYS = lambda kws: True
+NEVER = lambda kws: False
+
+def cached(filename_kws=(), ignore_kws=(), add_filenames=(), cache_if=ALWAYS, compute_if=ALWAYS):
     """
     >>> @cached()
     ... def f(x):
@@ -194,9 +197,14 @@ def cached(filename_kws=(), ignore_kws=(), add_filenames=(), cache_if=lambda kws
 
             # Compute
 
-            t = time.time()
-            r = f(**kws)
-            dt = time.time() - t
+            if compute_if(kws):
+                t = time.time()
+                r = f(**kws)
+                dt = time.time() - t
+
+            else:
+                logging.error("Cannot answer {}({}) from path {} and compute_if() returned False".format(f.__name__, kws, cache_path))
+                raise Exception()
 
             # Save to cache
 

@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy.linalg as LA
 
-from cache import cached
+from cache import cached, NEVER, ALWAYS
 from navkit import prepare_positioning, prepare_mapmatching, run_positioning, run_mapmatching
 from timer import Timer
 import curfer
@@ -31,11 +31,10 @@ np.set_printoptions(threshold=9999999999,linewidth=99999,precision=3)
 
 GPS_TTP_FILENAME = '/tmp/gps.ttp'
 MAX_COMPONENTS = 10
+HAVE_NAVKIT = False
 
 
-
-
-@cached(filename_kws = ['curfer_filename'])
+@cached(filename_kws = ['curfer_filename'], compute_if=ALWAYS if HAVE_NAVKIT else NEVER)
 def curfer_to_road_ids(curfer_filename):
     """
     Convert the given curfer trace to TTP,
@@ -76,8 +75,9 @@ def preprocess_data(curfer_directory):
     # Precondition: make sure map service runs
     # and needed navkit components are compiled
 
-    prepare_positioning()
-    prepare_mapmatching()
+    if HAVE_NAVKIT:
+        prepare_positioning()
+        prepare_mapmatching()
 
     filenames = osutil.find_recursive(sys.argv[1], 'data')
 
