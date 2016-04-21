@@ -105,6 +105,47 @@ class Routes:
         else:
             return 0.0
 
+def to_directed_arcs(route, coordinate_route, road_ids_to_endpoints):
+    """
+    routes: iterable over road ids
+    coordinate_routes: iterable over (lat, lon) pairs describing entry points to those roads
+    road_ids_to_endpoint: dict { road_id: ((lat_enter, lon_enter), (lat_leave, lon_leave)) }
+
+    return: iterable over (road_id, direction) pairs where direction is either 0 or 1.
+        Last road_id is discarded (as only one point of that arc is known)
+    """
+
+    for road_id, coord in zip(route, coordinate_route):
+        enter, leave = road_ids_to_endpoints[road_id]
+        dist_enter = geo.distance(coord, enter)
+        dist_leave = geo.distance(coord, leave)
+
+        #print("dist_enter", dist_enter, "dist_leave", dist_leave)
+        #assert dist_enter != dist_leave
+
+        if dist_enter > dist_leave:
+            yield (road_id, 0)
+        else:
+            yield (road_id, 1)
+
+def find_cycle(route):
+
+    for i, e in enumerate(route):
+        try:
+            idx = route[:i].index(e)
+            return idx, i, e
+        except ValueError, e:
+            pass
+
+    return None
+
+def remove_duplicates(route):
+    seen = set()
+    seen_add = seen.add
+    return [x for x in route if not (x in seen or seen_add(x))]
+
+
+
 def routes_to_array(routes, ids):
     """
     routes: iterable over (iterable over route ids)

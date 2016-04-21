@@ -32,16 +32,16 @@ class RouteModelSimmons:
         """
         g = route[-1]
 
-        for from_, to_ in zip(route, route[1:] + [self.ARRIVAL]):
+        for from_, to in zip(route, route[1:] + [self.ARRIVAL]):
             self._pgl[from_][g] += 1
 
-            list_ = self._pls[to_]
-            for i, (from2, g2, m) in enumerate(list_):
-                if from2 == from_ and g2 == g:
-                    list_[i] = (from_, g, m + 1)
+            list_ = self._pls[from_]
+            for i, (to2, g2, m) in enumerate(list_):
+                if to2 == to and g2 == g:
+                    list_[i] = (to, g, m + 1)
                     break
             else:
-                list_.append( (from_, g, 1) )
+                list_.append( (to, g, 1) )
 
     def predict_arrival(self, partial_route):
         return self._pgl[ partial_route[-1] ]
@@ -65,7 +65,7 @@ class RouteModelSimmons:
         while True:
             # MLE estimate, marginalize over goals
             most_likely = self.predict_arc(partial).most_common(1)
-            if len(most_likely) < 1 or most_likely[0] is None:
+            if len(most_likely) < 1 or most_likely[0][0] is None:
                 break
 
             partial.append(most_likely[0][0])

@@ -245,23 +245,44 @@ def analyze(r):
 
 
 def train_simmons(d):
-    routes = d['routes']
+    road_ids_to_endpoints = d['road_ids_to_endpoints']
+    routes = [
+            list(route_analysis.remove_duplicates(route_analysis.to_directed_arcs(route, coordinate_route, road_ids_to_endpoints)))
+            for route, coordinate_route in zip(d['routes'], d['coordinate_routes'])
+            ]
+
+    print("total routes:", len(routes))
+
+    #routes = [r for r in routes if route_analysis.find_cycle(route) is None]
+
+    #print("routes w/o cycles:", len(routes))
+
+    for route in routes:
+        cyc = route_analysis.find_cycle(route)
+
+        if cyc is not None:
+            print("cycle in:", route)
+            print(cyc)
+
     #road_ids_to_endpoints = d['road_ids_to_endpoints']
     #coordinate_routes = d['coordinate_routes']
 
     model = RouteModelSimmons()
 
-    test_idx = 0
+    test_idx = 3
 
     test_route = routes[test_idx]
     del routes[test_idx]
 
+
+
     for route in routes:
         model.learn_route(route)
 
-    pos = len(test_route) / 2
+    pos = len(test_route) / 4
     partial = test_route[:pos]
     expected = test_route[pos:]
+    predicted = model.predict_route(partial)
 
     print("full:")
     print(test_route)
@@ -270,8 +291,30 @@ def train_simmons(d):
     print("expected:")
     print(expected)
     print("predicted:")
-    print(model.predict_route(partial))
+    print(predicted)
 
+
+    lines = gmaps.line_sets([
+        [road_ids_to_endpoints[x[0]] for x in partial],
+        [road_ids_to_endpoints[x[0]] for x in expected],
+        ])
+    g = gmaps.generate_gmaps(
+            center = road_ids_to_endpoints.values()[0][0],
+            lines = lines)
+    f = open('/tmp/gmaps_simmons_expected.html', 'w')
+    f.write(g)
+    f.close()
+
+    lines = gmaps.line_sets([
+        [road_ids_to_endpoints[x[0]] for x in partial],
+        [road_ids_to_endpoints[x[0]] for x in predicted],
+        ])
+    g = gmaps.generate_gmaps(
+            center = road_ids_to_endpoints.values()[0][0],
+            lines = lines)
+    f = open('/tmp/gmaps_simmons_predicted.html', 'w')
+    f.write(g)
+    f.close()
 
 if __name__ == '__main__':
     d = preprocess_data(sys.argv[1])
