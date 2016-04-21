@@ -17,14 +17,15 @@ import numpy.linalg as LA
 
 from cache import cached, NEVER, ALWAYS
 from navkit import prepare_positioning, prepare_mapmatching, run_positioning, run_mapmatching
+from route_model_simmons import RouteModelSimmons
 from timer import Timer
 import curfer
+import geo
 import gmaps
 import osutil
 import plots
 import route_analysis
 import ttp
-import geo
 
 np.set_printoptions(threshold=9999999999,linewidth=99999,precision=3)
 
@@ -198,12 +199,7 @@ def cluster_routes(r):
         f.close()
 
 
-
-if __name__ == '__main__':
-    d = preprocess_data(sys.argv[1])
-
-    r = route_analysis.Routes(d)
-
+def analyze(r):
     with Timer('PCA'):
         pca = PCA(n_components=MAX_COMPONENTS)
         S_pca = pca.fit(r.X).transform(r.X)
@@ -246,6 +242,45 @@ if __name__ == '__main__':
         for i in range(min(MAX_COMPONENTS, components.shape[1])):
             component = components[:,i]
             render_road_ids(r, component, 'ic_{}'.format(i))
+
+
+def train_simmons(d):
+    routes = d['routes']
+    #road_ids_to_endpoints = d['road_ids_to_endpoints']
+    #coordinate_routes = d['coordinate_routes']
+
+    model = RouteModelSimmons()
+
+    test_idx = 0
+
+    test_route = routes[test_idx]
+    del routes[test_idx]
+
+    for route in routes:
+        model.learn_route(route)
+
+    pos = len(test_route) / 2
+    partial = test_route[:pos]
+    expected = test_route[pos:]
+
+    print("full:")
+    print(test_route)
+    print("partial:")
+    print(partial)
+    print("expected:")
+    print(expected)
+    print("predicted:")
+    print(model.predict_route(partial))
+
+
+if __name__ == '__main__':
+    d = preprocess_data(sys.argv[1])
+
+    train_simmons(d)
+
+    # r = route_analysis.Routes(d)
+    # analyze(r)
+
 
     print('\n'.join(Timer.pop_log()))
 
