@@ -64,15 +64,33 @@ class RouteModelSimmons:
         arcs = {}
         while True:
             # MLE estimate, marginalize over goals
-            most_likely = self.predict_arc(partial).most_common(1)
+            most_likely = self.predict_arc(partial).most_common()
             if len(most_likely) < 1 or most_likely[0][0] is None:
                 break
 
-            partial.append(most_likely[0][0])
+            #print("l=", len(most_likely))
+            for m in most_likely:
+                #print("trying ", m)
+                if m[0] not in partial:
+                    partial.append(m[0])
+                    break
+            else:
+                #print(partial)
+                e = Exception("no solution w/o cycle found, aborting route!")
+                e.route = partial[len(partial_route):]
+                raise e
+                #raise Exception(
+                #break
+                #return {
+                        #'route': partial
+                        #}
 
-            if len(partial) > 1000:
-                print("too long")
-                break
+
+
+            #if len(partial) > 1000:
+                #print(partial)
+                #print("too long")
+                #break
 
         return partial[len(partial_route):]
 

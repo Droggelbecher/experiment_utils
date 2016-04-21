@@ -26,6 +26,7 @@ import osutil
 import plots
 import route_analysis
 import ttp
+import iterutils
 
 np.set_printoptions(threshold=9999999999,linewidth=99999,precision=3)
 
@@ -244,14 +245,80 @@ def analyze(r):
             render_road_ids(r, component, 'ic_{}'.format(i))
 
 
-def train_simmons(d):
+
+def test_partial_prediction(d):
     road_ids_to_endpoints = d['road_ids_to_endpoints']
+
+
+    def plot_gmaps(partial, continuation, name):
+        lines = gmaps.line_sets([
+            [road_ids_to_endpoints[x[0]] for x in partial],
+            [road_ids_to_endpoints[x[0]] for x in continuation],
+            ])
+        g = gmaps.generate_gmaps(center = road_ids_to_endpoints.values()[0][0], lines = lines)
+        f = open('/tmp/gmaps_{}.html'.format(name), 'w')
+        f.write(g)
+        f.close()
+
+    def jaccard(r1, r2):
+        s1 = set(r1)
+        s2 = set(r2)
+        return len(s1.intersection(s2)) / float(len(s1.union(s2)))
+
+
+    # Preprocess routes:
+    # 1. assign directions
+    # 2. remove duplicates (so routes contain no cycles)
     routes = [
             list(route_analysis.remove_duplicates(route_analysis.to_directed_arcs(route, coordinate_route, road_ids_to_endpoints)))
             for route, coordinate_route in zip(d['routes'], d['coordinate_routes'])
             ]
 
     print("total routes:", len(routes))
+
+
+    # Cross-validate prediction accuracy
+    #
+    CV_FACTOR = 10
+    partial_length = 0.5
+
+    chunks = list(iterutils.chunks(routes, CV_FACTOR))
+
+    for cv_idx in range(CV_FACTOR):
+        model = RouteModelSimmons()
+
+        for idx in range(CV_FACTOR):
+            if idx != cv_idx:
+                for route in chunks[idx]:
+                    model.learn_route(route)
+
+        scores = []
+        for route in chunks[cv_idx]:
+            l = int(partial_length * len(route))
+            partial = route[:l]
+            expected = route[l:]
+
+            try:
+                predicted = model.predict_route(partial)
+                scores.append(jaccard(expected, predicted))
+            except Exception as e:
+                predicted = e.route
+                plot_gmaps(partial, expected, 'cycle_expected')
+                plot_gmaps(partial, predicted, 'cycle_predicted')
+
+            if scores[-1] == 0:
+                plot_gmaps(partial, expected, 'zero_expected')
+                plot_gmaps(partial, predicted, 'zero_predicted')
+
+
+        print("chunk {:2d}: {:3d} routes score/jaccard min {:5.4f} avg {:5.4f} max {:5.4f}".format(
+            cv_idx, len(chunks[cv_idx]), min(scores), sum(scores)/len(scores),
+            max(scores)))
+
+
+
+
+def train_simmons(d):
 
     #routes = [r for r in routes if route_analysis.find_cycle(route) is None]
 
@@ -319,7 +386,8 @@ def train_simmons(d):
 if __name__ == '__main__':
     d = preprocess_data(sys.argv[1])
 
-    train_simmons(d)
+    #train_simmons(d)
+    test_partial_prediction(d)
 
     # r = route_analysis.Routes(d)
     # analyze(r)
