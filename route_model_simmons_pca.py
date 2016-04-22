@@ -41,6 +41,7 @@ class RouteModelSimmonsPCA:
         #print("t=", t)
 
         t = (p,) + tuple(self._quantize_pc(x) for x in self._pca.transform(a.reshape(1, -1))[0,:1])
+        #t = p
         return t
 
     def _project(self, partial):
@@ -125,7 +126,7 @@ class RouteModelSimmonsPCA:
         r = Counter()
         for l, g, m in self._pls[ self._index(partial_route) ]:
             if l is self.ARRIVAL:
-                w = 99.9
+                w = 1.0
             else:
                 w = pc_weights[self._road_id_to_index[l]]
             #print('r[{}] = {:6.4f} * {:6.4f} * {:6.4f}'.format(l, arrivals[g], m, w))
