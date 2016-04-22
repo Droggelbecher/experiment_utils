@@ -343,7 +343,7 @@ def test_partial_prediction(d):
                 conf_spca.append(confidence ** (1.0 / len(predicted)) if len(predicted) else 0)
                 #conf_spca.append(confidence)
                 
-                if conf_spca[-1] > .97:
+                if conf_spca[-1] > .95:
                     confident_score_spca.append(score_spca[-1])
 
             except CyclicRouteException as e:

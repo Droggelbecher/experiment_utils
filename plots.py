@@ -38,7 +38,8 @@ def relation(xs, ys, filename):
     a = np.array([xs, ys])
     cov = np.cov(a)
     print(cov)
-    #plt.xlim((.9, 1.0))
+    plt.clf()
+    plt.xlim((.9, 1.0))
     plt.scatter(xs, ys)
     plt.savefig(filename, dpi=100)
 

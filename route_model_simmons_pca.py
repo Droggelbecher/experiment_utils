@@ -152,7 +152,7 @@ class RouteModelSimmonsPCA:
     def predict_arrival(self, partial_route):
         return self._pgl[ self._index(partial_route) ]
 
-    def predict_arc(self, partial_route):
+    def predict_arc(self, partial_route, fix_g = None):
         """
         returns: { route_id: count, ... }
         """
@@ -162,6 +162,10 @@ class RouteModelSimmonsPCA:
 
         r = Counter()
         for l, g, m in self._pls[ self._index(partial_route) ]:
+
+            if fix_g is not None and g != fix_g:
+                continue
+
             if l is self.ARRIVAL:
                 w = 1.0
             else:
@@ -181,9 +185,16 @@ class RouteModelSimmonsPCA:
 
         confidence = 1.0
 
+
+        arrivals = self.predict_arrival(partial_route)
+        if len(arrivals) > 0:
+            max_arrival = arrivals.most_common()[0][0]
+        else:
+            max_arrival = None
+
         arcs = {}
         while True:
-            most_likely = self.predict_arc(partial).most_common()
+            most_likely = self.predict_arc(partial, fix_g = max_arrival).most_common()
             if len(most_likely) < 1:
                 # TODO Should being lost lower our confidence?
                 print("i'm lost!")
