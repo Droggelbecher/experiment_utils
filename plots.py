@@ -34,3 +34,25 @@ def all_relations(a, filename):
     f.set_size_inches((2*features, 2*features))
     f.savefig(filename, dpi=100)
 
+def cdfs(a, filename):
+    """
+    a: [ [ ... ], [ ... ], ... ]
+    """
+
+    for d, c in zip(a, plt.cm.Spectral(np.linspace(0, 1, len(a)))):
+        xs = d['values']
+
+
+        avg = np.sum(xs)/len(xs)
+
+        xs, counts = np.unique(xs, return_counts = True)
+        ys = np.cumsum(counts)
+
+        plt.plot(xs, ys, c=c, label=d['label'])
+        plt.axvline(x = avg, color=c, label=d['label'] + ' avg',
+        linestyle='--')
+
+    plt.legend(loc='best')
+    plt.savefig(filename, dpi=100)
+
+

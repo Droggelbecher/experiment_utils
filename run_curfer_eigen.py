@@ -289,8 +289,8 @@ def test_partial_prediction(d):
 
     chunks = list(iterutils.chunks(routes, CV_FACTOR))
 
-    total_simmons = []
-    total_simmons_pca = []
+    score_s = []
+    score_spca = []
 
     for cv_idx in range(CV_FACTOR):
         print("cv_idx={} routes={}".format(cv_idx, len(chunks[cv_idx])))
@@ -312,8 +312,6 @@ def test_partial_prediction(d):
                 road_ids_to_endpoints
                 )
 
-        scores_simmons = []
-        scores_simmons_pca = []
 
         for i, route in enumerate(chunks[cv_idx]):
             sys.stdout.flush()
@@ -324,7 +322,7 @@ def test_partial_prediction(d):
 
             try:
                 predicted = simmons.predict_route(partial)
-                scores_simmons.append(jaccard(expected, predicted))
+                score_s.append(jaccard(expected, predicted))
             except Exception as e:
                 print(e)
                 print('route=', e.route)
@@ -337,7 +335,7 @@ def test_partial_prediction(d):
 
             try:
                 predicted = simmons_pca.predict_route(partial)
-                scores_simmons_pca.append(jaccard(expected, predicted))
+                score_spca.append(jaccard(expected, predicted))
             except CyclicRouteException as e:
                 print(e)
                 print('route=', e.route)
@@ -350,25 +348,36 @@ def test_partial_prediction(d):
 
             plot_gmaps(partial, expected, 'spca_expected')
             plot_gmaps(partial, predicted, 'spca_predicted')
-            if len(scores_simmons_pca) > 0 and scores_simmons_pca[-1] == 0:
+            if len(score_spca) > 0 and score_spca[-1] == 0:
                 #print("expected", expected)
                 #print("predicted", predicted)
                 plot_gmaps(partial, expected, 'zero_expected')
                 plot_gmaps(partial, predicted, 'zero_predicted')
 
 
-        total_simmons.append(sum(scores_simmons)/len(scores_simmons))
-        print("chunk {:2d}: {:3d} routes simmons score/jaccard min {:5.4f} avg {:5.4f} max {:5.4f}".format(
-            cv_idx, len(chunks[cv_idx]), min(scores_simmons), sum(scores_simmons)/len(scores_simmons),
-            max(scores_simmons)))
+        #total_simmons.append(sum(scores_s)/len(scores_s))
+        #print("chunk {:2d}: {:3d} routes simmons score/jaccard min {:5.4f} avg {:5.4f} max {:5.4f}".format(
+            #cv_idx, len(chunks[cv_idx]), min(scores_s), sum(scores_s)/len(scores_s),
+            #max(scores_s)))
 
-        total_simmons_pca.append(sum(scores_simmons_pca)/len(scores_simmons_pca))
-        print("chunk {:2d}: {:3d} routes simmons_pca score/jaccard min {:5.4f} avg {:5.4f} max {:5.4f}".format(
-            cv_idx, len(chunks[cv_idx]), min(scores_simmons_pca), sum(scores_simmons_pca)/len(scores_simmons_pca),
-            max(scores_simmons_pca)))
+        #total_simmons_pca.append(sum(scores_spca)/len(scores_spca))
+        #print("chunk {:2d}: {:3d} routes simmons_pca score/jaccard min {:5.4f} avg {:5.4f} max {:5.4f}".format(
+            #cv_idx, len(chunks[cv_idx]), min(scores_spca), sum(scores_spca)/len(scores_spca),
+            #max(scores_spca)))
 
-    print("total simmons score/jaccard avg {:5.4f}".format(sum(total_simmons)/len(total_simmons)))
-    print("total simmons_pca score/jaccard avg {:5.4f}".format(sum(total_simmons_pca)/len(total_simmons_pca)))
+    plots.cdfs([
+        {
+            'label': 'Simmons',
+            'values': score_s,
+            },
+        {
+            'label': 'Simmons+PCA',
+            'values': score_spca,
+            }
+        ], '/tmp/scores.pdf' )
+
+    #print("total simmons score/jaccard avg {:5.4f}".format(sum(total_simmons)/len(total_simmons)))
+    #print("total simmons_pca score/jaccard avg {:5.4f}".format(sum(total_simmons_pca)/len(total_simmons_pca)))
 
 
 
