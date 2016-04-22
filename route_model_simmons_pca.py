@@ -44,8 +44,6 @@ class RouteModelSimmonsPCA:
         N_COMPONENTS = 1
         a = self._route_to_array(partial, default = 0.5)
         p = partial[-1] #if len(partial) else 0
-        #t = (p,) + tuple(self._quantize_pc(x) for x in self._pca.transform(a.reshape(1, -1))[0])
-        #print("t=", t)
 
         t = (p,) + tuple(self._quantize_pc(x) for x in self._pca.transform(a.reshape(1, -1))[0,:N_COMPONENTS])
         #t = p
@@ -168,6 +166,9 @@ class RouteModelSimmonsPCA:
                 w = 1.0
             else:
                 w = pc_weights[self._road_id_to_index[l]]
+
+            if w < 0:
+                w = 0
             #print('r[{}] = {:6.4f} * {:6.4f} * {:6.4f}'.format(l, arrivals[g], m, w))
 
             r[l] = arrivals[g] * m * w
@@ -178,28 +179,36 @@ class RouteModelSimmonsPCA:
     def predict_route(self, partial_route):
         partial = partial_route[:]
 
+        confidence = 1.0
+
         arcs = {}
         while True:
-            # MLE estimate, marginalize over goals
             most_likely = self.predict_arc(partial).most_common()
             if len(most_likely) < 1:
+                # TODO Should being lost lower our confidence?
                 print("i'm lost!")
-                #print("lost after: ", partial[len(partial_route):])
+                confidence = 0
                 break
 
-            for i, m in enumerate(most_likely):
-                if m[0] is None or m[0][0] is None:
-                    print("is None: [{}]={}".format(i, m))
-                    return partial[len(partial_route):]
+            for i, (route_id, weight) in enumerate(most_likely):
+                if route_id is None:
+                    #d = float(weight - (most_likely[1][1] if len(most_likely) > 1 else 0.0))
+                    confidence *= (float(weight) / sum(v for _, v in most_likely))
+                    return partial[len(partial_route):], confidence
 
-                elif m[0] not in partial:
-                    partial.append(m[0])
+                elif route_id not in partial:
+                    partial.append(route_id)
                     break
             else:
                 e = CyclicRouteException("no solution w/o cycle found, aborting route!")
                 e.route = partial[len(partial_route):]
                 raise e
 
-        return partial[len(partial_route):]
+            confidence *= float(weight) / sum(v for _, v in most_likely)
+            #d = float(weight - (most_likely[1][1] if len(most_likely) > 1 else 0.0))
+            #confidence *= weight
+
+        r = partial[len(partial_route):], confidence
+        return partial[len(partial_route):], confidence
 
 

@@ -34,6 +34,14 @@ def all_relations(a, filename):
     f.set_size_inches((2*features, 2*features))
     f.savefig(filename, dpi=100)
 
+def relation(xs, ys, filename):
+    a = np.array([xs, ys])
+    cov = np.cov(a)
+    print(cov)
+    #plt.xlim((.9, 1.0))
+    plt.scatter(xs, ys)
+    plt.savefig(filename, dpi=100)
+
 def cdfs(a, filename):
     """
     a: [ [ ... ], [ ... ], ... ]

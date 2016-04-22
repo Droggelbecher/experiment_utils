@@ -255,12 +255,14 @@ def test_partial_prediction(d):
     road_ids_to_endpoints = d['road_ids_to_endpoints']
 
 
-    def plot_gmaps(partial, continuation, name):
+    def plot_gmaps(partial, continuation, name, **kws):
         lines = gmaps.line_sets([
             [road_ids_to_endpoints[x[0]] for x in partial],
             [road_ids_to_endpoints[x[0]] for x in continuation],
             ])
-        g = gmaps.generate_gmaps(center = road_ids_to_endpoints.values()[0][0], lines = lines)
+        info = ['{}: {}'.format(k, v) for k, v in kws.items()]
+        g = gmaps.generate_gmaps(center = road_ids_to_endpoints.values()[0][0], lines = lines,
+                info = info)
         f = open('/tmp/gmaps_{}.html'.format(name), 'w')
         f.write(g)
         f.close()
@@ -291,6 +293,8 @@ def test_partial_prediction(d):
 
     score_s = []
     score_spca = []
+    conf_spca = []
+    confident_score_spca = []
 
     for cv_idx in range(CV_FACTOR):
         print("cv_idx={} routes={}".format(cv_idx, len(chunks[cv_idx])))
@@ -334,8 +338,14 @@ def test_partial_prediction(d):
             print("predicting route {}...".format(i))
 
             try:
-                predicted = simmons_pca.predict_route(partial)
+                predicted, confidence = simmons_pca.predict_route(partial)
                 score_spca.append(jaccard(expected, predicted))
+                conf_spca.append(confidence ** (1.0 / len(predicted)) if len(predicted) else 0)
+                #conf_spca.append(confidence)
+                
+                if conf_spca[-1] > .97:
+                    confident_score_spca.append(score_spca[-1])
+
             except CyclicRouteException as e:
                 print(e)
                 print('route=', e.route)
@@ -344,29 +354,25 @@ def test_partial_prediction(d):
                 plot_gmaps(partial, expected, 'cycle_expected')
                 plot_gmaps(partial, predicted, 'cycle_predicted')
 
-            #print("predicted=", predicted)
+            print("cv {} i {} confidence {} score {}".format(cv_idx, i, confidence, score_spca[-1]))
+            plot_gmaps(partial, expected,
+                    'spca_{}_{}_expected'.format(cv_idx, i))
+            plot_gmaps(partial, predicted,
+                    'spca_{}_{}_predicted'.format(cv_idx, i),
+                    #confidence = confidence ** (1.0 / len(predicted)) if len(predicted) else 0,
+                    confidence = confidence,
+                    score = score_spca[-1])
 
-            plot_gmaps(partial, expected, 'spca_expected')
-            plot_gmaps(partial, predicted, 'spca_predicted')
             if len(score_spca) > 0 and score_spca[-1] == 0:
                 #print("expected", expected)
                 #print("predicted", predicted)
                 plot_gmaps(partial, expected, 'zero_expected')
                 plot_gmaps(partial, predicted, 'zero_predicted')
 
+    plots.relation(conf_spca, score_spca, '/tmp/conf_score.pdf')
 
-        #total_simmons.append(sum(scores_s)/len(scores_s))
-        #print("chunk {:2d}: {:3d} routes simmons score/jaccard min {:5.4f} avg {:5.4f} max {:5.4f}".format(
-            #cv_idx, len(chunks[cv_idx]), min(scores_s), sum(scores_s)/len(scores_s),
-            #max(scores_s)))
 
-        #total_simmons_pca.append(sum(scores_spca)/len(scores_spca))
-        #print("chunk {:2d}: {:3d} routes simmons_pca score/jaccard min {:5.4f} avg {:5.4f} max {:5.4f}".format(
-            #cv_idx, len(chunks[cv_idx]), min(scores_spca), sum(scores_spca)/len(scores_spca),
-            #max(scores_spca)))
-
-    plots.cdfs([
-        {
+    plots.cdfs([{
             'label': 'Simmons',
             'values': score_s,
             },
@@ -376,9 +382,12 @@ def test_partial_prediction(d):
             }
         ], '/tmp/scores.pdf' )
 
-    #print("total simmons score/jaccard avg {:5.4f}".format(sum(total_simmons)/len(total_simmons)))
-    #print("total simmons_pca score/jaccard avg {:5.4f}".format(sum(total_simmons_pca)/len(total_simmons_pca)))
-
+    print("total simmons score/jaccard min {:5.4f} avg {:5.4f} max {:5.4f}".format(min(score_s), sum(score_s)/len(score_s),
+        max(score_s)))
+    print("total simmons_pca score/jaccard min {:5.4f} avg {:5.4f} max {:5.4f}".format(min(score_spca), sum(score_spca)/len(score_spca),
+        max(score_spca)))
+    print("total simmons_pca confident-score/jaccard count {} min {:5.4f} avg {:5.4f} max {:5.4f}".format(len(confident_score_spca), min(confident_score_spca), sum(confident_score_spca)/len(confident_score_spca),
+        max(confident_score_spca)))
 
 
 
