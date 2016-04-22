@@ -96,7 +96,11 @@ def preprocess_data(curfer_directory):
     for curfer_filename in filenames:
         d = curfer_to_road_ids(curfer_filename = curfer_filename)
 
-        road_ids_to_endpoints.update(d['road_ids_to_endpoints'])
+        for k, (a, b) in d['road_ids_to_endpoints'].items():
+            # Only update if new entry is unambiguous
+            if a != b:
+                road_ids_to_endpoints[k] = (a, b)
+        #road_ids_to_endpoints.update(d['road_ids_to_endpoints'])
         routes.append(d['roadids'])
         coordinate_routes.append(d['coordinates'])
         departure_times.append(d['departure_time'])

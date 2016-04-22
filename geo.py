@@ -1,10 +1,20 @@
 
 import math
 
-def distance((lat1, lon1), (lat2, lon2)):
+#def distance((lat1, lon1), (lat2, lon2)):
+def distance(*args):
     """
     Returns distance in meters between 2 lat/lon points
     """
+    try:
+        (lat1, lon1), (lat2, lon2) = args
+    except ValueError:
+        # scikit learn's balls tree seems to call user provided distance functions
+        # once with weird-ass arguments on initialization.
+        # Return some crap in that case, its the best we can do actually.
+        return 0.0
+
+
     if lat1 == lat2 and lon1 == lon2:
         return 0.0
 

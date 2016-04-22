@@ -116,9 +116,20 @@ def to_directed_arcs(route, coordinate_route, road_ids_to_endpoints):
     """
 
     for road_id, coord in zip(route, coordinate_route):
-        enter, leave = road_ids_to_endpoints[road_id]
+        try:
+            enter, leave = road_ids_to_endpoints[road_id]
+        except KeyError:
+            # There are, alas no differentiable entry- and leave points
+            # for this arc
+
+            print("road_id {} not directable!".format(road_id))
+            continue
+            #continue
+
         dist_enter = geo.distance(coord, enter)
         dist_leave = geo.distance(coord, leave)
+
+        assert enter != leave
 
         #print("dist_enter", dist_enter, "dist_leave", dist_leave)
         #assert dist_enter != dist_leave

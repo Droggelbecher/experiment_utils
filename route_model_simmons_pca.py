@@ -1,8 +1,14 @@
 
 from collections import defaultdict, Counter
+import sys
+import pprint
+
 import numpy as np
 from sklearn.decomposition import PCA, FastICA
-import sys
+from sklearn.cluster import DBSCAN
+
+import geo
+import gmaps
 
 class CyclicRouteException(Exception):
     pass
@@ -35,17 +41,18 @@ class RouteModelSimmonsPCA:
         """
         Turn given partial route into a hash table index
         """
-        a = self._route_to_array(partial, default = 0.0)
+        N_COMPONENTS = 1
+        a = self._route_to_array(partial, default = 0.5)
         p = partial[-1] #if len(partial) else 0
         #t = (p,) + tuple(self._quantize_pc(x) for x in self._pca.transform(a.reshape(1, -1))[0])
         #print("t=", t)
 
-        t = (p,) + tuple(self._quantize_pc(x) for x in self._pca.transform(a.reshape(1, -1))[0,:1])
+        t = (p,) + tuple(self._quantize_pc(x) for x in self._pca.transform(a.reshape(1, -1))[0,:N_COMPONENTS])
         #t = p
         return t
 
     def _project(self, partial):
-        a = self._route_to_array(partial, default = 0.0)
+        a = self._route_to_array(partial, default = 0.5)
         return tuple(x for x in self._pca.transform(a.reshape(1, -1))[0])
 
     def _quantize_pc(self, v):
@@ -58,19 +65,43 @@ class RouteModelSimmonsPCA:
             return 1.0
         return 0
 
+    def _destination_label(self, road_id):
+        return self._destination_labels(self._road_id_to_index(road_id))
 
     def learn_routes(self, routes, road_ids_to_endpoints):
-        print("pca...")
-        #routes = d['routes']
-        #road_ids_to_endpoints = d['road_ids_to_endpoints']
-        #coordinate_routes = d['coordinate_routes']
+
+        # Map: road_id (+dir) -> leave-point
+
+        self._road_id_to_endpoint = {(k, 0): v[1] for k, v in road_ids_to_endpoints.items()}
+        self._road_id_to_endpoint.update({(k, 1): v[0] for k, v in road_ids_to_endpoints.items()})
+
+        # Map: road_id (+dir) -> index
 
         s = list(enumerate(sorted(road_ids_to_endpoints.keys())))
         l = len(s)
-
         self._road_id_to_index = {(k, 0): i for i, k in s}
         self._road_id_to_index.update({(k, 1): i + l for i, k in s})
 
+        # Cluster destinations
+
+        a_destinations = np.zeros((len(routes), 2))
+        for i, route in enumerate(routes):
+            a_destinations[i, :] = self._road_id_to_endpoint[route[-1]]
+
+        dbscan = DBSCAN(eps = 200, metric = geo.distance).fit(a_destinations)
+
+        print("destination labels", dbscan.labels_)
+
+        g = gmaps.generate_gmaps(
+                markers = a_destinations[dbscan.labels_ != -1, :],
+                center = a_destinations[0, :],
+                )
+        f = open('/tmp/gmaps_destinations.html', 'w')
+        f.write(g)
+        f.close()
+
+
+        # Principal component analysis -> correlated road ids
 
         # Convert routes to array
         # routes: [ [ (road_id, direction_flag), .... ], .... ]
@@ -89,13 +120,21 @@ class RouteModelSimmonsPCA:
         print("variances={}".format(self._pca.explained_variance_ratio_))
 
         print("learning routes...")
-        for i, route in enumerate(routes):
-            #print('learn {}/{}'.format(i, len(routes)))
-            #sys.stdout.flush()
-            self._learn_route(route)
+        for route, g in zip(routes, dbscan.labels_):
+            self._learn_route(route, g)
 
-    def _learn_route(self, route):
-        g = route[-1]
+        print "pgl="
+        pprint.pprint(dict(self._pgl))
+        print "pls="
+        pprint.pprint(dict(self._pls))
+
+    def _learn_route(self, route, g):
+        #g = self._destination_label(route[-1])
+
+        if g == -1:
+            print("route classified as noise")
+            # destination was classified as noise, don't learn this route!
+            return
 
         for i, (from_, to) in enumerate(zip(route, route[1:] + [self.ARRIVAL])):
             pc_vector = self._index(route[:i + 1])
