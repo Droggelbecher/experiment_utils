@@ -11,6 +11,8 @@ class RouteModelSimmonsPCA:
 
     ARRIVAL = None
 
+    MAX_COMPONENTS = 3
+
     def __init__(self):
         # { (arc, pc0, pc1, ...): [(li, g, m), ...], ... }
         self._pls = defaultdict(list)
@@ -20,24 +22,38 @@ class RouteModelSimmonsPCA:
 
     def _route_to_array(self, route, default = 0.0):
         s = set(route)
-        r = np.full(len(self._sorted_road_ids), default)
+        r = np.full(len(self._road_id_to_index), default)
         for id_ in s:
             if id_ is None:
                 # TODO: find out why this can even happen
                 continue
-            idx = self._sorted_road_ids.index(id_) 
-            r[self._sorted_road_ids.index(id_)] = 1
+            idx = self._road_id_to_index[id_]
+            r[idx] = 1
         return r
 
-    def _project(self, partial):
+    def _index(self, partial):
         """
-        Project given (partial) route to principal components
+        Turn given partial route into a hash table index
         """
-        a = self._route_to_array(partial, default = 0.1)
-        p = partial[-1] if len(partial) else 0
-        t = (p,) + tuple(round(x, 1) for x in self._pca.transform(a.reshape(1, -1))[0])
+        #a = self._route_to_array(partial, default = 0.1)
+        p = partial[-1] #if len(partial) else 0
+        #t = (p,) + tuple(self._quantize_pc(x) for x in self._pca.transform(a.reshape(1, -1))[0])
         #print("t=", t)
-        return t
+        return p
+
+    def _project(self, partial):
+        a = self._route_to_array(partial, default = 0.1)
+        return tuple(self._quantize_pc(x) for x in self._pca.transform(a.reshape(1, -1))[0])
+
+    def _quantize_pc(self, v):
+        #return v
+        return round(v, 2)
+        eps = 0.001
+        if v < -eps:
+            return -1.0
+        if v > eps:
+            return 1.0
+        return eps
 
 
     def learn_routes(self, routes, road_ids_to_endpoints):
@@ -45,28 +61,28 @@ class RouteModelSimmonsPCA:
         #routes = d['routes']
         #road_ids_to_endpoints = d['road_ids_to_endpoints']
         #coordinate_routes = d['coordinate_routes']
-        self._sorted_road_ids = [(x, 0) for x in sorted(road_ids_to_endpoints.keys())] \
-                + [(x, 1) for x in sorted(road_ids_to_endpoints.keys())]
+
+        s = list(enumerate(sorted(road_ids_to_endpoints.keys())))
+        l = len(s)
+
+        self._road_id_to_index = {(k, 0): i for i, k in s}
+        self._road_id_to_index.update({(k, 1): i + l for i, k in s})
 
 
         # Convert routes to array
         # routes: [ [ (road_id, direction_flag), .... ], .... ]
 
-        self._X = np.zeros(shape = (len(routes), len(self._sorted_road_ids)))
+        self._X = np.zeros(shape = (len(routes), len(self._road_id_to_index)))
 
         for i, route in enumerate(routes):
             for r in route:
-                try:
-                    j = self._sorted_road_ids.index(r)
-                    self._X[i, j] = 1
-                except ValueError:
-                    pass
+                j = self._road_id_to_index[r]
+                self._X[i, j] = 1
 
-
-        MAX_COMPONENTS = 3
-
-        self._pca = PCA(n_components = MAX_COMPONENTS)
+        self._pca = PCA(n_components = self.MAX_COMPONENTS)
         self._pca.fit(self._X)
+
+        print("variances={}".format(self._pca.explained_variance_ratio_))
 
         print("learning routes...")
         for i, route in enumerate(routes):
@@ -78,7 +94,7 @@ class RouteModelSimmonsPCA:
         g = route[-1]
 
         for i, (from_, to) in enumerate(zip(route, route[1:] + [self.ARRIVAL])):
-            pc_vector = self._project(route[:i])
+            pc_vector = self._index(route[:i + 1])
 
             #print("g=", g)
             self._pgl[ pc_vector ][g] += 1
@@ -93,18 +109,25 @@ class RouteModelSimmonsPCA:
                 list_.append( (to, g, 1) )
 
     def predict_arrival(self, partial_route):
-        #print "pgl=", self._pgl
-        return self._pgl[ self._project(partial_route) ]
+        return self._pgl[ self._index(partial_route) ]
 
     def predict_arc(self, partial_route):
         """
         returns: { route_id: count, ... }
         """
         arrivals = self.predict_arrival(partial_route)
-        #print("arrivals=", arrivals)
+
+        pc_weights = self._pca.inverse_transform(self._project(partial_route))
+
         r = Counter()
-        for l, g, m in self._pls[ self._project(partial_route) ]:
-            r[l] = arrivals[g] * m
+        for l, g, m in self._pls[ self._index(partial_route) ]:
+            if l is self.ARRIVAL:
+                w = 99.9
+            else:
+                w = pc_weights[self._road_id_to_index[l]]
+            #print('r[{}] = {:6.4f} * {:6.4f} * {:6.4f}'.format(l, arrivals[g], m, w))
+
+            r[l] = arrivals[g] * m * w
 
         return r
 
@@ -118,6 +141,7 @@ class RouteModelSimmonsPCA:
             most_likely = self.predict_arc(partial).most_common()
             if len(most_likely) < 1:
                 print("i'm lost!")
+                #print("lost after: ", partial[len(partial_route):])
                 break
 
             for i, m in enumerate(most_likely):
