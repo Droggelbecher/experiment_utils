@@ -69,7 +69,7 @@ def line_sets(ll):
          ]
     """
     ll = list(ll)
-    for line_set, c in zip(ll, plt.cm.Spectral(np.linspace(0, 1, len(ll)))):
+    for line_set, c in zip(ll, plt.cm.Set1(np.linspace(0, 1, len(ll)))):
         for (from_, to) in line_set:
             yield {
                     'path': [ { 'lat': from_[0], 'lng': from_[1] }, { 'lat': to[0], 'lng': to[1] } ],

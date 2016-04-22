@@ -39,20 +39,21 @@ def cdfs(a, filename):
     a: [ [ ... ], [ ... ], ... ]
     """
 
-    for d, c in zip(a, plt.cm.Spectral(np.linspace(0, 1, len(a)))):
+    for d, c in zip(a, plt.cm.Set1(np.linspace(0, 1, len(a)))):
         xs = d['values']
 
 
         avg = np.sum(xs)/len(xs)
+        median = np.median(xs)
 
         xs, counts = np.unique(xs, return_counts = True)
         ys = np.cumsum(counts)
 
         plt.plot(xs, ys, c=c, label=d['label'])
-        plt.axvline(x = avg, color=c, label=d['label'] + ' avg',
-        linestyle='--')
+        plt.axvline(x = avg, color=c, label=d['label'] + ' avg', linestyle=':') 
+        plt.axvline(x = median, color=c, label=d['label'] + ' median', linestyle='--') 
 
-    plt.legend(loc='best')
+    plt.legend(loc='best', prop={'size': 8})
     plt.savefig(filename, dpi=100)
 
 
