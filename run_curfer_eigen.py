@@ -18,6 +18,7 @@ import numpy.linalg as LA
 from cache import cached, NEVER, ALWAYS
 from navkit import prepare_positioning, prepare_mapmatching, run_positioning, run_mapmatching
 from route_model_simmons import RouteModelSimmons
+from route_model_simmons_pca import RouteModelSimmonsPCA, CyclicRouteException
 from timer import Timer
 import curfer
 import geo
@@ -285,35 +286,75 @@ def test_partial_prediction(d):
     chunks = list(iterutils.chunks(routes, CV_FACTOR))
 
     for cv_idx in range(CV_FACTOR):
-        model = RouteModelSimmons()
+        print("cv_idx={}".format(cv_idx))
+
+        simmons = RouteModelSimmons()
+        simmons_pca = RouteModelSimmonsPCA()
+
+        # learn simmons
 
         for idx in range(CV_FACTOR):
             if idx != cv_idx:
                 for route in chunks[idx]:
-                    model.learn_route(route)
+                    simmons.learn_route(route)
 
-        scores = []
+        # learn simmons PCA
+
+        simmons_pca.learn_routes(
+                list(itertools.chain(*(chunks[:cv_idx] + chunks[cv_idx + 1:]))),
+                road_ids_to_endpoints
+                )
+
+        scores_simmons = []
+        scores_simmons_pca = []
+
         for route in chunks[cv_idx]:
+            sys.stdout.flush()
+
             l = int(partial_length * len(route))
             partial = route[:l]
             expected = route[l:]
 
+            #try:
+                #predicted = simmons.predict_route(partial)
+                #scores_simmons.append(jaccard(expected, predicted))
+            #except Exception as e:
+                #print(e)
+                #print('route=', e.route)
+                #sys.stdout.flush()
+                #predicted = e.route
+                #plot_gmaps(partial, expected, 'cycle_expected')
+                #plot_gmaps(partial, predicted, 'cycle_predicted')
+
             try:
-                predicted = model.predict_route(partial)
-                scores.append(jaccard(expected, predicted))
-            except Exception as e:
+                predicted = simmons_pca.predict_route(partial)
+                scores_simmons_pca.append(jaccard(expected, predicted))
+            except CyclicRouteException as e:
+                print(e)
+                print('route=', e.route)
+                sys.stdout.flush()
                 predicted = e.route
                 plot_gmaps(partial, expected, 'cycle_expected')
                 plot_gmaps(partial, predicted, 'cycle_predicted')
 
-            if scores[-1] == 0:
+            print("predicted=", predicted)
+
+            plot_gmaps(partial, expected, 'spca_expected')
+            plot_gmaps(partial, predicted, 'spca_predicted')
+            if scores_simmons_pca[-1] == 0:
+                #print("expected", expected)
+                #print("predicted", predicted)
                 plot_gmaps(partial, expected, 'zero_expected')
                 plot_gmaps(partial, predicted, 'zero_predicted')
 
 
-        print("chunk {:2d}: {:3d} routes score/jaccard min {:5.4f} avg {:5.4f} max {:5.4f}".format(
-            cv_idx, len(chunks[cv_idx]), min(scores), sum(scores)/len(scores),
-            max(scores)))
+        #print("chunk {:2d}: {:3d} routes simmons score/jaccard min {:5.4f} avg {:5.4f} max {:5.4f}".format(
+            #cv_idx, len(chunks[cv_idx]), min(scores_simmons), sum(scores_simmons)/len(scores_simmons),
+            #max(scores_simmons)))
+
+        print("chunk {:2d}: {:3d} routes simmons_pca score/jaccard min {:5.4f} avg {:5.4f} max {:5.4f}".format(
+            cv_idx, len(chunks[cv_idx]), min(scores_simmons_pca), sum(scores_simmons_pca)/len(scores_simmons_pca),
+            max(scores_simmons_pca)))
 
 
 
