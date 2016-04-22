@@ -281,7 +281,7 @@ def test_partial_prediction(d):
     # Cross-validate prediction accuracy
     #
     CV_FACTOR = 10
-    partial_length = 0.5
+    partial_length = 0.25
 
     chunks = list(iterutils.chunks(routes, CV_FACTOR))
 
@@ -363,8 +363,8 @@ def test_partial_prediction(d):
             cv_idx, len(chunks[cv_idx]), min(scores_simmons_pca), sum(scores_simmons_pca)/len(scores_simmons_pca),
             max(scores_simmons_pca)))
 
-    print("total simmons {:5.4f}".format(sum(total_simmons)/len(total_simmons)))
-    print("total simmons_pca {:5.4f}".format(sum(total_simmons_pca)/len(total_simmons_pca)))
+    print("total simmons score/jaccard avg {:5.4f}".format(sum(total_simmons)/len(total_simmons)))
+    print("total simmons_pca score/jaccard avg {:5.4f}".format(sum(total_simmons_pca)/len(total_simmons_pca)))
 
 
 

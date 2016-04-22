@@ -35,25 +35,27 @@ class RouteModelSimmonsPCA:
         """
         Turn given partial route into a hash table index
         """
-        #a = self._route_to_array(partial, default = 0.1)
+        a = self._route_to_array(partial, default = 0.0)
         p = partial[-1] #if len(partial) else 0
         #t = (p,) + tuple(self._quantize_pc(x) for x in self._pca.transform(a.reshape(1, -1))[0])
         #print("t=", t)
-        return p
+
+        t = (p,) + tuple(self._quantize_pc(x) for x in self._pca.transform(a.reshape(1, -1))[0,:1])
+        return t
 
     def _project(self, partial):
-        a = self._route_to_array(partial, default = 0.1)
-        return tuple(self._quantize_pc(x) for x in self._pca.transform(a.reshape(1, -1))[0])
+        a = self._route_to_array(partial, default = 0.0)
+        return tuple(x for x in self._pca.transform(a.reshape(1, -1))[0])
 
     def _quantize_pc(self, v):
         #return v
-        return round(v, 2)
-        eps = 0.001
+        #return round(v, 1)
+        eps = 0.1
         if v < -eps:
             return -1.0
         if v > eps:
             return 1.0
-        return eps
+        return 0
 
 
     def learn_routes(self, routes, road_ids_to_endpoints):
@@ -73,6 +75,7 @@ class RouteModelSimmonsPCA:
         # routes: [ [ (road_id, direction_flag), .... ], .... ]
 
         self._X = np.zeros(shape = (len(routes), len(self._road_id_to_index)))
+        #self._X = np.full((len(routes), len(self._road_id_to_index)), -1.0)
 
         for i, route in enumerate(routes):
             for r in route:
