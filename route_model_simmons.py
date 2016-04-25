@@ -14,6 +14,7 @@ class CyclicRouteException(Exception):
 class RouteModelSimmons:
 
     ARRIVAL = None
+    BACKTRACK = True
 
     def __init__(self):
         # p(li|sj) = { lj: [(li, g, m), ...], ... }
@@ -90,16 +91,31 @@ class RouteModelSimmons:
         else:
             max_arrival = None
 
-        arcs = {}
+        forbidden_arcs = set()
+
+        print("max_arrival", max_arrival)
+
         while True:
             # MLE estimate, marginalize over goals
             most_likely = self.predict_arc(partial, features, fix_g = max_arrival).most_common()
+            likely_allowed = [(k, v) for (k, v) in most_likely if k not in forbidden_arcs]
 
-            if len(most_likely) < 1:
-                print("i'm lost!")
-                break
+            print("most_likely", most_likely)
+            print("likely_allowed", likely_allowed)
 
-            for i, (route_id, weight) in enumerate(most_likely):
+
+            if len(likely_allowed) < 1:
+                if not self.BACKTRACK or len(partial) <= len(partial_route):
+                    e = CyclicRouteException("stuck with no alternatives!")
+                    e.route = partial[len(partial_route):]
+                    raise e
+                else:
+                    print("backtracking")
+                    forbidden_arcs.add(partial[-1])
+                    del partial[-1]
+                    continue
+
+            for i, (route_id, weight) in enumerate(likely_allowed):
                 if route_id is self.ARRIVAL:
                     likelihood *= float(weight) / sum(v for _, v in most_likely)
                     return partial[len(partial_route):], likelihood
