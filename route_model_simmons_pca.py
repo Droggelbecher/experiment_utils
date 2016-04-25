@@ -20,15 +20,12 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
     PCA_WEIGHTS = False
     CLUSTER_DESTINATIONS = False
     REJECT_NOISE_DESTINATIONS = False
-    INDEX_COMPONENTS = 1
+    INDEX_COMPONENTS = 2
 
     def _route_to_array(self, route, default = 0.0):
         s = set(route)
         r = np.full(len(self._road_id_to_index), default)
         for id_ in s:
-            #if id_ is None:
-                ## TODO: find out why this can even happen
-                #continue
             idx = self._road_id_to_index[id_]
             r[idx] = 1
         return r
@@ -57,7 +54,7 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
 
     def _quantize_pc(self, v):
         #return round(v, 1)
-        eps = 0 #.001
+        eps = 0 #.1
         if v < -eps:
             return -1.0
         if v > eps:

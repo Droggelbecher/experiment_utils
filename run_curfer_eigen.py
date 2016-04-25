@@ -362,6 +362,13 @@ def test_partial_prediction(d):
                         lens_predicted.append(len(predicted))
 
                     except CyclicRouteException as e:
+                        scores.append(0)
+                        likelihoods.append(0)
+                        lengths.append(l)
+                        lens_partial.append(l)
+                        lens_expected.append(len(expected))
+                        lens_predicted.append(0)
+
                         score = -1
                         likelihood = -1
                         predicted = e.route
