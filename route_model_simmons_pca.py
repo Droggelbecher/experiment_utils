@@ -17,7 +17,7 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
     ARRIVAL = None
 
     MAX_COMPONENTS = 3
-    PCA_WEIGHTS = False
+    PCA_WEIGHTS = True
     CLUSTER_DESTINATIONS = False
     REJECT_NOISE_DESTINATIONS = False
     INDEX_COMPONENTS = 1
@@ -44,7 +44,10 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
         else:
 
             a = np.hstack((self._route_to_array(partial, default = 0.5), np.array(features)))
-            p = partial[-1]
+            if len(partial):
+                p = partial[-1]
+            else:
+                p = -1
             r = (p,) + tuple(self._quantize_pc(x) for x in self._pca.transform(a.reshape(1, -1))[0,:self.INDEX_COMPONENTS])
             return r
 

@@ -20,6 +20,7 @@ from cache import cached, NEVER, ALWAYS
 from navkit import prepare_positioning, prepare_mapmatching, run_positioning, run_mapmatching
 from route_model_simmons import RouteModelSimmons, CyclicRouteException
 from route_model_simmons_pca import RouteModelSimmonsPCA
+from route_model_simmons_nofeatures import RouteModelSimmonsNoFeatures
 from timer import Timer
 import curfer
 import geo
@@ -296,8 +297,6 @@ def test_partial_prediction(d):
     CV_FACTOR = 10
     chunks = list(iterutils.chunks(zip(routes, features), CV_FACTOR))
 
-    partial_length = 0.75
-
 
     def jaccard(r1, r2):
         s1 = set(r1)
@@ -308,79 +307,103 @@ def test_partial_prediction(d):
         IGNORE_LAST_ARCS = 5
         return jaccard(predicted[:-IGNORE_LAST_ARCS], expected[:-IGNORE_LAST_ARCS])
 
+    results = {}
 
-    route_models = [
-            C(name = 'Simmons', class_ = RouteModelSimmons,
-                scores = [], likelihoods = []),
-            C(name = 'SimmonsPCA', class_ = RouteModelSimmonsPCA,
-                scores = [], likelihoods = [])
-            ]
+    for partial_length in (0.0, 0.25, 0.5, 0.75):
+        route_models = [
+                C(name = 'SimmonsNoF', class_ = RouteModelSimmonsNoFeatures,
+                    scores = [], likelihoods = []),
+                C(name = 'Simmons', class_ = RouteModelSimmons,
+                    scores = [], likelihoods = []),
+                C(name = 'SimmonsPCA', class_ = RouteModelSimmonsPCA,
+                    scores = [], likelihoods = [])
+                ]
 
-    lengths = []
-    for cv_idx in range(CV_FACTOR):
-        print("cv_idx={} routes={}".format(cv_idx, len(chunks[cv_idx])))
+        results[partial_length] = route_models
 
+        lengths = []
+        for cv_idx in range(CV_FACTOR):
+            print("cv_idx={} routes={}".format(cv_idx, len(chunks[cv_idx])))
+
+            for d in route_models:
+                model = d.class_()
+                scores = d.scores
+                likelihoods = d.likelihoods
+                name = d.name
+
+                model.learn_routes(
+                        list(itertools.chain(*(chunks[:cv_idx] + chunks[cv_idx + 1:]))),
+                        road_ids_to_endpoints,
+                        )
+
+                for i, (route, features) in enumerate(chunks[cv_idx]):
+                    l = int(partial_length * len(route))
+                    l = max(l, 1)
+                    partial = route[:l]
+                    expected = route[l:]
+                    predicted = []
+
+                    try:
+                        predicted, likelihood = model.predict_route(partial, features)
+                        score = eval_metric(predicted, expected)
+                        scores.append(score)
+                        likelihoods.append(likelihood)
+                        lengths.append(l)
+
+                    except CyclicRouteException as e:
+                        score = -1
+                        likelihood = -1
+                        predicted = e.route
+                        print(e)
+                        print('route=', e.route)
+                        sys.stdout.flush()
+                        #predicted = e.route
+                        #plot_gmaps(partial, expected, 'cycle_expected')
+                        #plot_gmaps(partial, predicted, 'cycle_predicted')
+
+
+                    print("cv {} i {} likelihood {} score {} explen {} predlen {}".format(cv_idx, i, likelihood, score, l, len(predicted)))
+                    plot_gmaps(partial, expected,
+                            '{}_{}_{}_expected'.format(name, cv_idx, i))
+                    plot_gmaps(partial, predicted,
+                            '{}_{}_{}_predicted'.format(name, cv_idx, i),
+                            likelihood = likelihood,
+                            score = score)
+
+        
+        print("prediction lengths min {:5d} avg {:7.3f} max {:5d}".format(
+            min(lengths), sum(lengths)/len(lengths), max(lengths)))
+
+    for partial_length, route_models in results.items():
         for d in route_models:
-            model = d.class_()
             scores = d.scores
             likelihoods = d.likelihoods
             name = d.name
 
-            model.learn_routes(
-                    list(itertools.chain(*(chunks[:cv_idx] + chunks[cv_idx + 1:]))),
-                    road_ids_to_endpoints,
-                    )
+            print("total partial length {:5.4f} {:20s} score/jaccard min {:5.4f} avg {:5.4f} max {:5.4f}".format(
+                partial_length,
+                name,
+                min(scores), sum(scores)/len(scores), max(scores)))
 
-            for i, (route, features) in enumerate(chunks[cv_idx]):
-                l = int(partial_length * len(route))
-                partial = route[:l]
-                expected = route[l:]
-                predicted = []
-
-                try:
-                    predicted, likelihood = model.predict_route(partial, features)
-                    score = eval_metric(predicted, expected)
-                    scores.append(score)
-                    likelihoods.append(likelihood)
-                    lengths.append(l)
-
-                except CyclicRouteException as e:
-                    score = -1
-                    likelihood = -1
-                    predicted = e.route
-                    print(e)
-                    print('route=', e.route)
-                    sys.stdout.flush()
-                    #predicted = e.route
-                    #plot_gmaps(partial, expected, 'cycle_expected')
-                    #plot_gmaps(partial, predicted, 'cycle_predicted')
+            plots.relation(likelihoods, scores, '/tmp/{}_likelihood_score_{}.pdf'.format(name, partial_length))
 
 
-                print("cv {} i {} likelihood {} score {} explen {} predlen {}".format(cv_idx, i, likelihood, score, l, len(predicted)))
-                plot_gmaps(partial, expected,
-                        '{}_{}_{}_expected'.format(name, cv_idx, i))
-                plot_gmaps(partial, predicted,
-                        '{}_{}_{}_predicted'.format(name, cv_idx, i),
-                        likelihood = likelihood,
-                        score = score)
 
-    
-    print("prediction lengths min {:5d} avg {:7.3f} max {:5d}".format(
-        min(lengths), sum(lengths)/len(lengths), max(lengths)))
+    lst = []
+    for l, rms in results.items():
+        for d in rms:
+            lst.append(dict(label = '{}_{}'.format(d.name, l), values = d.scores))
 
-    for d in route_models:
-        scores = d.scores
-        likelihoods = d.likelihoods
-        name = d.name
-
-        print("total {:20s} score/jaccard min {:5.4f} avg {:5.4f} max {:5.4f}".format(
-            name,
-            min(scores), sum(scores)/len(scores), max(scores)))
-
-        plots.relation(likelihoods, scores, '/tmp/{}_likelihood_score.pdf'.format(name))
+    plots.cdfs(lst, '/tmp/scores.pdf')
 
 
-    plots.cdfs([dict(label = d.name, values = d.scores) for d in route_models], '/tmp/scores.pdf')
+    for i in range(len(results.values()[0])):
+        ls = sorted(results.keys())
+        plots.boxplots(
+                xs = ls,
+                yss = [results[l][i].scores for l in ls],
+                filename = '/tmp/{}_by_length.pdf'.format(results[l][i].name)
+                )
 
 
 if __name__ == '__main__':

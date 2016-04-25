@@ -48,7 +48,9 @@ def cdfs(a, filename):
     """
 
     plt.clf()
+    plt.cla()
     for d, c in zip(a, plt.cm.Set1(np.linspace(0, 1, len(a)))):
+        print d['label'], d['values']
         values = d['values']
         avg = np.sum(values)/len(values)
         median = np.median(values)
@@ -57,10 +59,29 @@ def cdfs(a, filename):
         ys = np.cumsum(counts)
 
         plt.plot(xs, ys, c=c, label=d['label'])
-        plt.axvline(x = avg, color=c, label=d['label'] + ' avg', linestyle=':') 
-        plt.axvline(x = median, color=c, label=d['label'] + ' median', linestyle='--') 
+        plt.axvline(x = avg, color=c, linestyle=':') 
+        plt.axvline(x = median, color=c, linestyle='--') 
 
     plt.legend(loc='best', prop={'size': 8})
     plt.savefig(filename, dpi=100)
 
+def boxplots(xs, yss, filename):
+    plt.clf()
+    plt.cla()
+    #fig, axes = plt.subplots(1, 1)
 
+    plt.boxplot(yss, vert = True)
+    plt.setp(plt.axes(), xticklabels=xs)
+    
+    plt.autoscale()
+
+    plt.savefig(filename, dpi=100)
+
+def multi_boxplots(xs, ysss, filename):
+    fig, axes = plt.subplots(1, 1)
+
+    for yss, c in zip(ysss, plt.cm.Set1(np.linspace(0, 1, len(ysss)))):
+        axes.boxplot(yss, vert = True, boxprops={'color': c})
+
+    plt.setp(axes, xticklabels=xs)
+    fig.savefig(filename, dpi=100)

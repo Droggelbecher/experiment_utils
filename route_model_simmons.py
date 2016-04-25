@@ -33,7 +33,10 @@ class RouteModelSimmons:
         return route[0], route[1]
 
     def _index(self, partial, features):
-        return (partial[-1],) + tuple(features)
+        if len(partial):
+            return (partial[-1],) + tuple(features)
+        else:
+            return (-1,) + tuple(features)
 
     def learn_routes(self, routes, _):
         for r in routes:
