@@ -30,8 +30,7 @@ class RouteModelSimmons:
         self._pgl = defaultdict(Counter)
 
     def _split_route(self, route):
-        return route[0], route[1:]
-
+        return route[0], route[1]
 
     def _index(self, partial, features):
         return (partial[-1],) + tuple(features)

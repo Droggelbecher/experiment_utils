@@ -49,12 +49,12 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
             return r
 
     def _project(self, partial, features):
-        #a = self._route_to_array(partial, default = 0.5)
         a = np.hstack((self._route_to_array(partial, default = 0.5), np.array(features)))
         return tuple(x for x in self._pca.transform(a.reshape(1, -1))[0])
 
     def _quantize_pc(self, v):
-        eps = 0.1
+        #return round(v, 1)
+        eps = 0 #.001
         if v < -eps:
             return -1.0
         if v > eps:

@@ -49,13 +49,11 @@ def cdfs(a, filename):
 
     plt.clf()
     for d, c in zip(a, plt.cm.Set1(np.linspace(0, 1, len(a)))):
-        xs = d['values']
+        values = d['values']
+        avg = np.sum(values)/len(values)
+        median = np.median(values)
 
-
-        avg = np.sum(xs)/len(xs)
-        median = np.median(xs)
-
-        xs, counts = np.unique(xs, return_counts = True)
+        xs, counts = np.unique(values, return_counts = True)
         ys = np.cumsum(counts)
 
         plt.plot(xs, ys, c=c, label=d['label'])

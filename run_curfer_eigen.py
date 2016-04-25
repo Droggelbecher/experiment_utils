@@ -270,18 +270,23 @@ def test_partial_prediction(d):
         f.close()
 
 
+
     # Preprocess routes:
     # 1. assign directions
     # 2. remove duplicates (so routes contain no cycles)
     routes = [
-            (
-                list(route_analysis.remove_duplicates(route_analysis.to_directed_arcs(route, coordinate_route, road_ids_to_endpoints))),
-                datetime.utcfromtimestamp(departure_time).weekday(),
-                datetime.utcfromtimestamp(departure_time).hour,
-            )
+                list(route_analysis.remove_duplicates(route_analysis.to_directed_arcs(route, coordinate_route, road_ids_to_endpoints)))
             for route, coordinate_route, departure_time in
             zip(d['routes'], d['coordinate_routes'], d['departure_times'])
             ]
+
+    features = [] #np.zeros((len(routes), 24 + 7))
+    for i, departure_time in enumerate(d['departure_times']):
+        dt = datetime.utcfromtimestamp(departure_time)
+        f = np.zeros(7 + 24)
+        f[dt.weekday()] = 1.0
+        f[7 + dt.hour] = 1.0
+        features.append(f)
 
     print("total routes:", len(routes))
 
@@ -289,9 +294,9 @@ def test_partial_prediction(d):
     # Cross-validate prediction accuracy
     #
     CV_FACTOR = 10
-    chunks = list(iterutils.chunks(routes, CV_FACTOR))
+    chunks = list(iterutils.chunks(zip(routes, features), CV_FACTOR))
 
-    partial_length = 0.25
+    partial_length = 0.75
 
 
     def jaccard(r1, r2):
@@ -300,7 +305,8 @@ def test_partial_prediction(d):
         return len(s1.intersection(s2)) / float(len(s1.union(s2)))
 
     def eval_metric(predicted, expected):
-        return jaccard(predicted[:-5], expected[:-5])
+        IGNORE_LAST_ARCS = 5
+        return jaccard(predicted[:-IGNORE_LAST_ARCS], expected[:-IGNORE_LAST_ARCS])
 
 
     route_models = [
@@ -310,6 +316,7 @@ def test_partial_prediction(d):
                 scores = [], likelihoods = [])
             ]
 
+    lengths = []
     for cv_idx in range(CV_FACTOR):
         print("cv_idx={} routes={}".format(cv_idx, len(chunks[cv_idx])))
 
@@ -321,25 +328,26 @@ def test_partial_prediction(d):
 
             model.learn_routes(
                     list(itertools.chain(*(chunks[:cv_idx] + chunks[cv_idx + 1:]))),
-                    road_ids_to_endpoints
+                    road_ids_to_endpoints,
                     )
 
-            for i, routefeatures in enumerate(chunks[cv_idx]):
-                route, features = routefeatures[0], routefeatures[1:]
-
+            for i, (route, features) in enumerate(chunks[cv_idx]):
                 l = int(partial_length * len(route))
                 partial = route[:l]
                 expected = route[l:]
+                predicted = []
 
                 try:
                     predicted, likelihood = model.predict_route(partial, features)
                     score = eval_metric(predicted, expected)
                     scores.append(score)
                     likelihoods.append(likelihood)
+                    lengths.append(l)
 
                 except CyclicRouteException as e:
                     score = -1
                     likelihood = -1
+                    predicted = e.route
                     print(e)
                     print('route=', e.route)
                     sys.stdout.flush()
@@ -348,7 +356,7 @@ def test_partial_prediction(d):
                     #plot_gmaps(partial, predicted, 'cycle_predicted')
 
 
-                print("cv {} i {} likelihood {} score {}".format(cv_idx, i, likelihood, score))
+                print("cv {} i {} likelihood {} score {} explen {} predlen {}".format(cv_idx, i, likelihood, score, l, len(predicted)))
                 plot_gmaps(partial, expected,
                         '{}_{}_{}_expected'.format(name, cv_idx, i))
                 plot_gmaps(partial, predicted,
@@ -356,6 +364,9 @@ def test_partial_prediction(d):
                         likelihood = likelihood,
                         score = score)
 
+    
+    print("prediction lengths min {:5d} avg {:7.3f} max {:5d}".format(
+        min(lengths), sum(lengths)/len(lengths), max(lengths)))
 
     for d in route_models:
         scores = d.scores
