@@ -29,20 +29,24 @@ class RouteModelSimmons:
         # m = count
         self._pgl = defaultdict(Counter)
 
+    def _split_route(self, route):
+        return route[0], route[1:]
 
-    def _index(self, partial):
-        return partial[-1]
+
+    def _index(self, partial, features):
+        return (partial[-1],) + tuple(features)
 
     def learn_routes(self, routes, _):
-        for route in routes:
-            self._learn_route(route, route[-1])
+        for r in routes:
+            route, features = self._split_route(r)
+            self._learn_route(route, route[-1], features)
 
-    def _learn_route(self, route, g):
+    def _learn_route(self, route, g, features):
         """
         route: list of arc IDs
         """
         for i, (from_, to) in enumerate(zip(route, route[1:] + [self.ARRIVAL])):
-            idx = self._index(route[:i+1])
+            idx = self._index(route[:i+1], features)
             self._pgl[idx][g] += 1
 
             list_ = self._pls[idx]
@@ -53,27 +57,27 @@ class RouteModelSimmons:
             else:
                 list_.append( (to, g, 1) )
 
-    def predict_arrival(self, partial_route):
-        return self._pgl[ self._index(partial_route) ]
+    def predict_arrival(self, partial_route, features):
+        return self._pgl[ self._index(partial_route, features) ]
 
-    def predict_arc(self, partial_route, fix_g = None):
+    def predict_arc(self, partial_route, features, fix_g = None):
         """
         returns: { route_id: count, ... }
         """
-        arrivals = self.predict_arrival(partial_route)
+        arrivals = self.predict_arrival(partial_route, features)
 
         r = Counter()
-        for l, g, m in self._pls[ partial_route[-1] ]:
+        for l, g, m in self._pls[ self._index(partial_route, features) ]:
             if fix_g is not None and g != fix_g:
                 continue
             r[l] = arrivals[g] * m
 
         return r + Counter()
 
-    def predict_route(self, partial_route):
+    def predict_route(self, partial_route, features):
         partial = partial_route[:]
         likelihood = 1.0
-        arrivals = self.predict_arrival(partial_route)
+        arrivals = self.predict_arrival(partial_route, features)
 
         if len(arrivals) > 0:
             max_arrival = arrivals.most_common()[0][0]
@@ -83,7 +87,7 @@ class RouteModelSimmons:
         arcs = {}
         while True:
             # MLE estimate, marginalize over goals
-            most_likely = self.predict_arc(partial, fix_g = max_arrival).most_common()
+            most_likely = self.predict_arc(partial, features, fix_g = max_arrival).most_common()
             if len(most_likely) < 1:
                 print("i'm lost!")
                 break

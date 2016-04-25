@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import math
 import itertools
+from datetime import datetime
 
 from mpl_toolkits.mplot3d import Axes3D
 from sklearn.cluster import DBSCAN
@@ -273,8 +274,13 @@ def test_partial_prediction(d):
     # 1. assign directions
     # 2. remove duplicates (so routes contain no cycles)
     routes = [
-            list(route_analysis.remove_duplicates(route_analysis.to_directed_arcs(route, coordinate_route, road_ids_to_endpoints)))
-            for route, coordinate_route in zip(d['routes'], d['coordinate_routes'])
+            (
+                list(route_analysis.remove_duplicates(route_analysis.to_directed_arcs(route, coordinate_route, road_ids_to_endpoints))),
+                datetime.utcfromtimestamp(departure_time).weekday(),
+                datetime.utcfromtimestamp(departure_time).hour,
+            )
+            for route, coordinate_route, departure_time in
+            zip(d['routes'], d['coordinate_routes'], d['departure_times'])
             ]
 
     print("total routes:", len(routes))
@@ -318,13 +324,15 @@ def test_partial_prediction(d):
                     road_ids_to_endpoints
                     )
 
-            for i, route in enumerate(chunks[cv_idx]):
+            for i, routefeatures in enumerate(chunks[cv_idx]):
+                route, features = routefeatures[0], routefeatures[1:]
+
                 l = int(partial_length * len(route))
                 partial = route[:l]
                 expected = route[l:]
 
                 try:
-                    predicted, likelihood = model.predict_route(partial)
+                    predicted, likelihood = model.predict_route(partial, features)
                     score = eval_metric(predicted, expected)
                     scores.append(score)
                     likelihoods.append(likelihood)

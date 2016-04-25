@@ -20,7 +20,7 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
     PCA_WEIGHTS = False
     CLUSTER_DESTINATIONS = False
     REJECT_NOISE_DESTINATIONS = False
-    INDEX_COMPONENTS = 0
+    INDEX_COMPONENTS = 1
 
     def _route_to_array(self, route, default = 0.0):
         s = set(route)
@@ -33,19 +33,24 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
             r[idx] = 1
         return r
 
-    def _index(self, partial):
+    def _index(self, partial, features):
         """
         Turn given partial route into a hash table index
         """
-        a = self._route_to_array(partial, default = 0.5)
-        p = partial[-1] #if len(partial) else 0
 
-        t = (p,) + tuple(self._quantize_pc(x) for x in self._pca.transform(a.reshape(1, -1))[0,:self.INDEX_COMPONENTS])
-        #t = p
-        return t
+        if self.INDEX_COMPONENTS == 0:
+            return RouteModelSimmons._index(self, partial, features)
 
-    def _project(self, partial):
-        a = self._route_to_array(partial, default = 0.5)
+        else:
+
+            a = np.hstack((self._route_to_array(partial, default = 0.5), np.array(features)))
+            p = partial[-1]
+            r = (p,) + tuple(self._quantize_pc(x) for x in self._pca.transform(a.reshape(1, -1))[0,:self.INDEX_COMPONENTS])
+            return r
+
+    def _project(self, partial, features):
+        #a = self._route_to_array(partial, default = 0.5)
+        a = np.hstack((self._route_to_array(partial, default = 0.5), np.array(features)))
         return tuple(x for x in self._pca.transform(a.reshape(1, -1))[0])
 
     def _quantize_pc(self, v):
@@ -74,7 +79,8 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
 
         if self.CLUSTER_DESTINATIONS:
             a_destinations = np.zeros((len(routes), 2))
-            for i, route in enumerate(routes):
+            for i, routefeatures in enumerate(routes):
+                route, features = self._split_route(routefeatures)
                 a_destinations[i, :] = self._road_id_to_endpoint[route[-1]]
 
             dbscan = DBSCAN(eps = 200, metric = geo.distance).fit(a_destinations)
@@ -95,12 +101,18 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
         # Convert routes to array
         # routes: [ [ (road_id, direction_flag), .... ], .... ]
 
-        self._X = np.zeros(shape = (len(routes), len(self._road_id_to_index)))
 
-        for i, route in enumerate(routes):
+        dummyroute, dummyfeature = self._split_route(routes[0])
+
+        self._X = np.zeros(shape = (len(routes), len(self._road_id_to_index) + len(dummyfeature)))
+
+        for i, routefeatures in enumerate(routes):
+            route, features = self._split_route(routefeatures)
             for r in route:
                 j = self._road_id_to_index[r]
                 self._X[i, j] = 1
+            for f in features:
+                self._X[i, len(self._road_id_to_index)] = f
 
         self._pca = PCA(n_components = self.MAX_COMPONENTS)
         self._pca.fit(self._X)
@@ -109,27 +121,28 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
 
         print("learning routes...")
         if self.CLUSTER_DESTINATIONS:
-            for route, g in zip(routes, dbscan.labels_):
-                self._learn_route(route, g)
+            for routefeatures, g in zip(routes, dbscan.labels_):
+                route, features = self._split_route(routefeatures)
+                self._learn_route(route, g, features)
         else:
             RouteModelSimmons.learn_routes(self, routes, road_ids_to_endpoints)
 
-    def _learn_route(self, route, g):
+    def _learn_route(self, route, g, features):
         if g == -1 and self.REJECT_NOISE_DESTINATIONS:
             print("route classified as noise")
             return
 
-        RouteModelSimmons._learn_route(self, route, g)
+        RouteModelSimmons._learn_route(self, route, g, features)
 
-    def predict_arc(self, partial_route, fix_g = None):
+    def predict_arc(self, partial_route, features, fix_g = None):
         """
         returns: { route_id: count, ... }
         """
-        arrivals = self.predict_arrival(partial_route)
-        pc_weights = self._pca.inverse_transform(self._project(partial_route))
+        arrivals = self.predict_arrival(partial_route, features)
+        pc_weights = self._pca.inverse_transform(self._project(partial_route, features))
         r = Counter()
 
-        for l, g, m in self._pls[ self._index(partial_route) ]:
+        for l, g, m in self._pls[ self._index(partial_route, features) ]:
             if fix_g is not None and g != fix_g:
                 continue
 
