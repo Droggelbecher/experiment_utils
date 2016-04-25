@@ -50,12 +50,17 @@ def cdfs(a, filename):
     plt.clf()
     plt.cla()
     for d, c in zip(a, plt.cm.Set1(np.linspace(0, 1, len(a)))):
-        print d['label'], d['values']
         values = d['values']
         avg = np.sum(values)/len(values)
         median = np.median(values)
 
-        xs, counts = np.unique(values, return_counts = True)
+        def indices_to_counts(xs, indices):
+            counts = indices[1:] - indices[:-1]
+            l = len(xs) - sum(indices)
+            return xs, np.hstack((counts, np.array([l])))
+
+        #xs, counts = np.unique(values, return_counts = True)
+        xs, counts = indices_to_counts( *np.unique(values, return_index = True) )
         ys = np.cumsum(counts)
 
         plt.plot(xs, ys, c=c, label=d['label'])
