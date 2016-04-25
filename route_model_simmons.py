@@ -41,12 +41,16 @@ class RouteModelSimmons:
     def learn_routes(self, routes, _):
         for r in routes:
             route, features = self._split_route(r)
+            if not len(route):
+                continue
             self._learn_route(route, route[-1], features)
 
     def _learn_route(self, route, g, features):
         """
         route: list of arc IDs
         """
+        if not len(route):
+            return
         for i, (from_, to) in enumerate(zip(route, route[1:] + [self.ARRIVAL])):
             idx = self._index(route[:i+1], features)
             self._pgl[idx][g] += 1

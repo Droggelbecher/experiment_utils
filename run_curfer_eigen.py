@@ -37,7 +37,7 @@ np.set_printoptions(threshold=9999999999,linewidth=99999,precision=3)
 
 GPS_TTP_FILENAME = '/tmp/gps.ttp'
 MAX_COMPONENTS = 10
-HAVE_NAVKIT = False
+HAVE_NAVKIT = True
 
 
 @cached(filename_kws = ['curfer_filename'], compute_if=ALWAYS if HAVE_NAVKIT else NEVER)
@@ -283,10 +283,11 @@ def test_partial_prediction(d):
 
     features = [] #np.zeros((len(routes), 24 + 7))
     for i, departure_time in enumerate(d['departure_times']):
-        dt = datetime.utcfromtimestamp(departure_time)
         f = np.zeros(7 + 24)
-        f[dt.weekday()] = 1.0
-        f[7 + dt.hour] = 1.0
+        if departure_time is not None:
+            dt = datetime.utcfromtimestamp(departure_time)
+            f[dt.weekday()] = 1.0
+            f[7 + dt.hour] = 1.0
         features.append(f)
 
     print("total routes:", len(routes))
@@ -301,7 +302,10 @@ def test_partial_prediction(d):
     def jaccard(r1, r2):
         s1 = set(r1)
         s2 = set(r2)
-        return len(s1.intersection(s2)) / float(len(s1.union(s2)))
+        union = s1.union(s2)
+        if len(union) == 0:
+            return 0
+        return len(s1.intersection(s2)) / float(len(union))
 
     def eval_metric(predicted, expected):
         IGNORE_LAST_ARCS = 5

@@ -17,7 +17,7 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
     ARRIVAL = None
 
     MAX_COMPONENTS = 3
-    PCA_WEIGHTS = True
+    PCA_WEIGHTS = False
     CLUSTER_DESTINATIONS = False
     REJECT_NOISE_DESTINATIONS = False
     INDEX_COMPONENTS = 1
@@ -84,6 +84,8 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
             a_destinations = np.zeros((len(routes), 2))
             for i, routefeatures in enumerate(routes):
                 route, features = self._split_route(routefeatures)
+                if not len(route):
+                    continue
                 a_destinations[i, :] = self._road_id_to_endpoint[route[-1]]
 
             dbscan = DBSCAN(eps = 200, metric = geo.distance).fit(a_destinations)
@@ -111,6 +113,8 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
 
         for i, routefeatures in enumerate(routes):
             route, features = self._split_route(routefeatures)
+            if not len(route):
+                continue
             for r in route:
                 j = self._road_id_to_index[r]
                 self._X[i, j] = 1

@@ -8,6 +8,8 @@ class RouteModelSimmonsNoFeatures(RouteModelSimmons):
     def learn_routes(self, routes, _):
         for r in routes:
             route, features = self._split_route(r)
+            if not len(route):
+                continue
             self._learn_route(route, route[-1], ())
 
     def predict_route(self, partial_route, features):
