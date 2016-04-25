@@ -12,6 +12,7 @@ def all_relations(a, filename):
     a: np array, rows for data, columns for features/axes
     """
 
+    plt.clf()
     features = a.shape[1]
     f, axs = plt.subplots(features - 1, features - 1, squeeze=False, sharex=True, sharey=True)
 
@@ -37,9 +38,7 @@ def all_relations(a, filename):
 def relation(xs, ys, filename):
     a = np.array([xs, ys])
     cov = np.cov(a)
-    print(cov)
     plt.clf()
-    plt.xlim((.9, 1.0))
     plt.scatter(xs, ys)
     plt.savefig(filename, dpi=100)
 
@@ -48,6 +47,7 @@ def cdfs(a, filename):
     a: [ [ ... ], [ ... ], ... ]
     """
 
+    plt.clf()
     for d, c in zip(a, plt.cm.Set1(np.linspace(0, 1, len(a)))):
         xs = d['values']
 

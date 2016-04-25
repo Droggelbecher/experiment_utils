@@ -10,10 +10,9 @@ from sklearn.cluster import DBSCAN
 import geo
 import gmaps
 
-class CyclicRouteException(Exception):
-    pass
+from route_model_simmons import RouteModelSimmons
 
-class RouteModelSimmonsPCA:
+class RouteModelSimmonsPCA(RouteModelSimmons):
 
     ARRIVAL = None
 
@@ -22,13 +21,6 @@ class RouteModelSimmonsPCA:
     CLUSTER_DESTINATIONS = False
     REJECT_NOISE_DESTINATIONS = False
     INDEX_COMPONENTS = 0
-
-    def __init__(self):
-        # { (arc, pc0, pc1, ...): [(li, g, m), ...], ... }
-        self._pls = defaultdict(list)
-
-        # { (arc, pc0, pc1, ...): { g: m, ... }, ... }
-        self._pgl = defaultdict(Counter)
 
     def _route_to_array(self, route, default = 0.0):
         s = set(route)
@@ -57,17 +49,12 @@ class RouteModelSimmonsPCA:
         return tuple(x for x in self._pca.transform(a.reshape(1, -1))[0])
 
     def _quantize_pc(self, v):
-        #return v
-        #return round(v, 1)
         eps = 0.1
         if v < -eps:
             return -1.0
         if v > eps:
             return 1.0
         return 0
-
-    def _destination_label(self, road_id):
-        return self._destination_labels(self._road_id_to_index(road_id))
 
     def learn_routes(self, routes, road_ids_to_endpoints):
 
@@ -109,7 +96,6 @@ class RouteModelSimmonsPCA:
         # routes: [ [ (road_id, direction_flag), .... ], .... ]
 
         self._X = np.zeros(shape = (len(routes), len(self._road_id_to_index)))
-        #self._X = np.full((len(routes), len(self._road_id_to_index)), -1.0)
 
         for i, route in enumerate(routes):
             for r in route:
@@ -126,104 +112,40 @@ class RouteModelSimmonsPCA:
             for route, g in zip(routes, dbscan.labels_):
                 self._learn_route(route, g)
         else:
-            for route in routes:
-                self._learn_route(route, route[-1])
-
-
-        #print "pgl="
-        #pprint.pprint(dict(self._pgl))
-        #print "pls="
-        #pprint.pprint(dict(self._pls))
+            RouteModelSimmons.learn_routes(self, routes, road_ids_to_endpoints)
 
     def _learn_route(self, route, g):
         if g == -1 and self.REJECT_NOISE_DESTINATIONS:
             print("route classified as noise")
-            # destination was classified as noise, don't learn this route!
             return
 
-        for i, (from_, to) in enumerate(zip(route, route[1:] + [self.ARRIVAL])):
-            pc_vector = self._index(route[:i + 1])
-
-            #print("g=", g)
-            self._pgl[ pc_vector ][g] += 1
-            #print("-----> pgl=", self._pgl)
-            list_ = self._pls[pc_vector]
-
-            for i, (to2, g2, m) in enumerate(list_):
-                if to2 == to and g2 == g:
-                    list_[i] = (to, g, m + 1)
-                    break
-            else:
-                list_.append( (to, g, 1) )
-
-    def predict_arrival(self, partial_route):
-        return self._pgl[ self._index(partial_route) ]
+        RouteModelSimmons._learn_route(self, route, g)
 
     def predict_arc(self, partial_route, fix_g = None):
         """
         returns: { route_id: count, ... }
         """
         arrivals = self.predict_arrival(partial_route)
-
         pc_weights = self._pca.inverse_transform(self._project(partial_route))
-
         r = Counter()
+
         for l, g, m in self._pls[ self._index(partial_route) ]:
             if fix_g is not None and g != fix_g:
                 continue
 
-            if l is self.ARRIVAL:
+            if not self.PCA_WEIGHTS or l is self.ARRIVAL:
                 w = 1.0
             else:
                 w = pc_weights[self._road_id_to_index[l]]
 
-            if w < 0:
-                w = 0
+            w = max(0, w)
             #print('r[{}] = {:6.4f} * {:6.4f} * {:6.4f}'.format(l, arrivals[g], m, w))
-
-            if not self.PCA_WEIGHTS:
-                w = 1.0
 
             r[l] = arrivals[g] * m * w
 
+        # The "... + Counter()" is for normalization (remove 0-counts etc...)
         return r + Counter()
 
 
-    def predict_route(self, partial_route):
-        partial = partial_route[:]
-
-        confidence = 1.0
-
-        arrivals = self.predict_arrival(partial_route)
-        if len(arrivals) > 0:
-            max_arrival = arrivals.most_common()[0][0]
-        else:
-            max_arrival = None
-
-        arcs = {}
-        while True:
-            most_likely = self.predict_arc(partial, fix_g = max_arrival).most_common()
-            if len(most_likely) < 1:
-                # TODO Should being lost lower our confidence?
-                print("i'm lost!")
-                #confidence = 0
-                break
-
-            for i, (route_id, weight) in enumerate(most_likely):
-                if route_id is None:
-                    confidence *= (float(weight) / sum(v for _, v in most_likely))
-                    return partial[len(partial_route):], confidence
-
-                elif route_id not in partial:
-                    partial.append(route_id)
-                    break
-            else:
-                e = CyclicRouteException("no solution w/o cycle found, aborting route!")
-                e.route = partial[len(partial_route):]
-                raise e
-
-            confidence *= float(weight) / sum(v for _, v in most_likely)
-
-        return partial[len(partial_route):], confidence
 
 
