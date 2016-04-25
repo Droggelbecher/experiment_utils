@@ -46,7 +46,7 @@ class RouteModelSimmons:
     def predict_arrival(self, partial_route):
         return self._pgl[ partial_route[-1] ]
 
-    def predict_arc(self, partial_route):
+    def predict_arc(self, partial_route, fix_g = None):
         """
         returns: { route_id: count, ... }
         """
@@ -54,43 +54,40 @@ class RouteModelSimmons:
 
         r = Counter()
         for l, g, m in self._pls[ partial_route[-1] ]:
+            if fix_g is not None and g != fix_g:
+                continue
             r[l] = arrivals[g] * m
 
-        return r
+        return r + Counter()
 
     def predict_route(self, partial_route):
         partial = partial_route[:]
 
+        arrivals = self.predict_arrival(partial_route)
+        if len(arrivals) > 0:
+            max_arrival = arrivals.most_common()[0][0]
+        else:
+            max_arrival = None
+
         arcs = {}
         while True:
             # MLE estimate, marginalize over goals
-            most_likely = self.predict_arc(partial).most_common()
+            most_likely = self.predict_arc(partial, fix_g = max_arrival).most_common()
             if len(most_likely) < 1 or most_likely[0][0] is None:
+                print("i'm lost!")
                 break
 
-            #print("l=", len(most_likely))
             for m in most_likely:
-                #print("trying ", m)
-                if m[0] not in partial:
+                if m[0] is self.ARRIVAL:
+                    return partial[len(partial_route):]
+
+                elif m[0] not in partial:
                     partial.append(m[0])
                     break
             else:
-                #print(partial)
                 e = Exception("no solution w/o cycle found, aborting route!")
                 e.route = partial[len(partial_route):]
                 raise e
-                #raise Exception(
-                #break
-                #return {
-                        #'route': partial
-                        #}
-
-
-
-            #if len(partial) > 1000:
-                #print(partial)
-                #print("too long")
-                #break
 
         return partial[len(partial_route):]
 

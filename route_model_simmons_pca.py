@@ -18,6 +18,10 @@ class RouteModelSimmonsPCA:
     ARRIVAL = None
 
     MAX_COMPONENTS = 3
+    PCA_WEIGHTS = False
+    CLUSTER_DESTINATIONS = False
+    REJECT_NOISE_DESTINATIONS = False
+    INDEX_COMPONENTS = 0
 
     def __init__(self):
         # { (arc, pc0, pc1, ...): [(li, g, m), ...], ... }
@@ -30,9 +34,9 @@ class RouteModelSimmonsPCA:
         s = set(route)
         r = np.full(len(self._road_id_to_index), default)
         for id_ in s:
-            if id_ is None:
-                # TODO: find out why this can even happen
-                continue
+            #if id_ is None:
+                ## TODO: find out why this can even happen
+                #continue
             idx = self._road_id_to_index[id_]
             r[idx] = 1
         return r
@@ -41,11 +45,10 @@ class RouteModelSimmonsPCA:
         """
         Turn given partial route into a hash table index
         """
-        N_COMPONENTS = 1
         a = self._route_to_array(partial, default = 0.5)
         p = partial[-1] #if len(partial) else 0
 
-        t = (p,) + tuple(self._quantize_pc(x) for x in self._pca.transform(a.reshape(1, -1))[0,:N_COMPONENTS])
+        t = (p,) + tuple(self._quantize_pc(x) for x in self._pca.transform(a.reshape(1, -1))[0,:self.INDEX_COMPONENTS])
         #t = p
         return t
 
@@ -82,21 +85,22 @@ class RouteModelSimmonsPCA:
 
         # Cluster destinations
 
-        a_destinations = np.zeros((len(routes), 2))
-        for i, route in enumerate(routes):
-            a_destinations[i, :] = self._road_id_to_endpoint[route[-1]]
+        if self.CLUSTER_DESTINATIONS:
+            a_destinations = np.zeros((len(routes), 2))
+            for i, route in enumerate(routes):
+                a_destinations[i, :] = self._road_id_to_endpoint[route[-1]]
 
-        dbscan = DBSCAN(eps = 200, metric = geo.distance).fit(a_destinations)
+            dbscan = DBSCAN(eps = 200, metric = geo.distance).fit(a_destinations)
 
-        print("destination labels", dbscan.labels_)
+            print("destination labels", dbscan.labels_)
 
-        g = gmaps.generate_gmaps(
-                markers = a_destinations[dbscan.labels_ != -1, :],
-                center = a_destinations[0, :],
-                )
-        f = open('/tmp/gmaps_destinations.html', 'w')
-        f.write(g)
-        f.close()
+            g = gmaps.generate_gmaps(
+                    markers = a_destinations[dbscan.labels_ != -1, :],
+                    center = a_destinations[0, :],
+                    )
+            f = open('/tmp/gmaps_destinations.html', 'w')
+            f.write(g)
+            f.close()
 
 
         # Principal component analysis -> correlated road ids
@@ -118,18 +122,21 @@ class RouteModelSimmonsPCA:
         print("variances={}".format(self._pca.explained_variance_ratio_))
 
         print("learning routes...")
-        for route, g in zip(routes, dbscan.labels_):
-            self._learn_route(route, g)
+        if self.CLUSTER_DESTINATIONS:
+            for route, g in zip(routes, dbscan.labels_):
+                self._learn_route(route, g)
+        else:
+            for route in routes:
+                self._learn_route(route, route[-1])
 
-        print "pgl="
-        pprint.pprint(dict(self._pgl))
-        print "pls="
-        pprint.pprint(dict(self._pls))
+
+        #print "pgl="
+        #pprint.pprint(dict(self._pgl))
+        #print "pls="
+        #pprint.pprint(dict(self._pls))
 
     def _learn_route(self, route, g):
-        #g = self._destination_label(route[-1])
-
-        if g == -1:
+        if g == -1 and self.REJECT_NOISE_DESTINATIONS:
             print("route classified as noise")
             # destination was classified as noise, don't learn this route!
             return
@@ -162,7 +169,6 @@ class RouteModelSimmonsPCA:
 
         r = Counter()
         for l, g, m in self._pls[ self._index(partial_route) ]:
-
             if fix_g is not None and g != fix_g:
                 continue
 
@@ -175,16 +181,18 @@ class RouteModelSimmonsPCA:
                 w = 0
             #print('r[{}] = {:6.4f} * {:6.4f} * {:6.4f}'.format(l, arrivals[g], m, w))
 
+            if not self.PCA_WEIGHTS:
+                w = 1.0
+
             r[l] = arrivals[g] * m * w
 
-        return r
+        return r + Counter()
 
 
     def predict_route(self, partial_route):
         partial = partial_route[:]
 
         confidence = 1.0
-
 
         arrivals = self.predict_arrival(partial_route)
         if len(arrivals) > 0:
@@ -198,12 +206,11 @@ class RouteModelSimmonsPCA:
             if len(most_likely) < 1:
                 # TODO Should being lost lower our confidence?
                 print("i'm lost!")
-                confidence = 0
+                #confidence = 0
                 break
 
             for i, (route_id, weight) in enumerate(most_likely):
                 if route_id is None:
-                    #d = float(weight - (most_likely[1][1] if len(most_likely) > 1 else 0.0))
                     confidence *= (float(weight) / sum(v for _, v in most_likely))
                     return partial[len(partial_route):], confidence
 
@@ -216,10 +223,7 @@ class RouteModelSimmonsPCA:
                 raise e
 
             confidence *= float(weight) / sum(v for _, v in most_likely)
-            #d = float(weight - (most_likely[1][1] if len(most_likely) > 1 else 0.0))
-            #confidence *= weight
 
-        r = partial[len(partial_route):], confidence
         return partial[len(partial_route):], confidence
 
 
