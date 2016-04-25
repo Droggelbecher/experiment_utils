@@ -86,13 +86,49 @@ def boxplots(xs, yss, filename):
 
     plt.savefig(filename, dpi=100)
 
-def multi_boxplots(xs, ysss, filename):
+def multi_boxplots(xs, ysss, filename, ylim = None, labels = []):
+    """
+    ysss = [ [ [ x x x x ], ... ], .... ]
+    """
+
     fig, axes = plt.subplots(1, 1)
 
-    for yss, c in zip(ysss, plt.cm.Set1(np.linspace(0, 1, len(ysss)))):
-        axes.boxplot(yss, vert = True, boxprops={'color': c})
+    k = len(ysss) + 1
+    dummylines = []
+    maxlen = 0
+    if len(labels) < len(ysss):
+        labels += [str(i) for i in range(len(ysss) - len(labels))]
 
-    plt.setp(axes, xticklabels=xs)
+    for yss, c, offset in zip(
+            ysss,
+            plt.cm.Paired(np.linspace(0, 1, len(ysss))),
+            range(1, 1 + len(ysss))):
+        maxlen = max(maxlen, len(yss))
+
+        # each yss is a data set and gets one color
+        ps = range(offset, len(yss) * k + offset, k)
+        bp = axes.boxplot(yss,
+                vert = True,
+                boxprops={'color': c},
+                widths = 0.6,
+                positions = ps)
+
+        for key, v in bp.items():
+            for e in v:
+                plt.setp(e, color = c)
+
+        # dummy line for legend
+        h, = plt.plot([1, 1], 'r-', c = c, color = c, linestyle='-')
+        dummylines.append(h)
+
+    plt.legend(dummylines, labels, loc='best', prop={'size': 8})
+    for l in dummylines:
+        l.set_visible(False)
+
+    plt.setp(axes, xticks = np.arange(k/2.0, k/2.0 + maxlen * k, k), xticklabels=xs)
+    axes.set_xlim((0, maxlen * k))
+    if ylim is not None:
+        axes.set_ylim(ylim)
     fig.savefig(filename, dpi=100)
 
 
@@ -123,3 +159,11 @@ if __name__ == '__main__':
         ]
 
     cdfs(a, '/tmp/test.pdf')
+
+    xs = [1.23, 4.56, 7.89]
+    ysss = [
+            [ [1, 1, 3, 8, 15], [6, 8, 7], [9, 0, 6, 7] ],
+            [ [2, 2, 3, 8, 6], [10, 10, 10, 6], [1,2,3,4,5] ],
+           ]
+    multi_boxplots(xs, ysss, '/tmp/multi_boxplots.pdf', labels=['foo', 'bar'])
+

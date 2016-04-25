@@ -37,7 +37,7 @@ np.set_printoptions(threshold=9999999999,linewidth=99999,precision=3)
 
 GPS_TTP_FILENAME = '/tmp/gps.ttp'
 MAX_COMPONENTS = 10
-HAVE_NAVKIT = True
+HAVE_NAVKIT = False
 
 
 @cached(filename_kws = ['curfer_filename'], compute_if=ALWAYS if HAVE_NAVKIT else NEVER)
@@ -315,12 +315,9 @@ def test_partial_prediction(d):
 
     for partial_length in (0.0, 0.25, 0.5, 0.75):
         route_models = [
-                C(name = 'SimmonsNoF', class_ = RouteModelSimmonsNoFeatures,
-                    scores = [], likelihoods = [], lens_partial = [], lens_expected = [], lens_predicted = []),
-                C(name = 'Simmons', class_ = RouteModelSimmons,
-                    scores = [], likelihoods = [], lens_partial = [], lens_expected = [], lens_predicted = []),
-                C(name = 'SimmonsPCA', class_ = RouteModelSimmonsPCA,
-                    scores = [], likelihoods = [], lens_partial = [], lens_expected = [], lens_predicted = []),
+                C(name = 'SimmonsNoF', class_ = RouteModelSimmonsNoFeatures, scores = [], likelihoods = [], lens_partial = [], lens_expected = [], lens_predicted = []),
+                C(name = 'Simmons',    class_ = RouteModelSimmons,           scores = [], likelihoods = [], lens_partial = [], lens_expected = [], lens_predicted = []),
+                C(name = 'SimmonsPCA', class_ = RouteModelSimmonsPCA,        scores = [], likelihoods = [], lens_partial = [], lens_expected = [], lens_predicted = []),
                 ]
 
         results[partial_length] = route_models
@@ -407,17 +404,26 @@ def test_partial_prediction(d):
     plots.cdfs(lst, '/tmp/scores.pdf')
 
 
+    ls = sorted(results.keys())
+
+    plots.multi_boxplots(
+            xs = ls,
+            ysss = [ [results[l][i].scores for l in ls] for i in range(len(route_models)) ],
+            labels = [rm.name for rm in route_models],
+            ylim = (-.1, 1.1),
+            filename = '/tmp/scores_by_length.pdf'
+            )
+
     #
     # Group things by Model (and nothing else):
     #
 
     for i in range(len(results.values()[0])):
-        ls = sorted(results.keys())
-        plots.boxplots(
-                xs = ls,
-                yss = [results[l][i].scores for l in ls],
-                filename = '/tmp/{}_by_length.pdf'.format(results[l][i].name)
-                )
+        #plots.boxplots(
+                #xs = ls,
+                #yss = [results[l][i].scores for l in ls],
+                #filename = '/tmp/{}_by_length.pdf'.format(results[l][i].name)
+                #)
 
         plots.relation(
                 itertools.chain(*[results[l][i].lens_partial for l in ls]),
