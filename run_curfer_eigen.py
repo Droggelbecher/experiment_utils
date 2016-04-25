@@ -316,11 +316,11 @@ def test_partial_prediction(d):
     for partial_length in (0.0, 0.25, 0.5, 0.75):
         route_models = [
                 C(name = 'SimmonsNoF', class_ = RouteModelSimmonsNoFeatures,
-                    scores = [], likelihoods = []),
+                    scores = [], likelihoods = [], lens_partial = [], lens_expected = [], lens_predicted = []),
                 C(name = 'Simmons', class_ = RouteModelSimmons,
-                    scores = [], likelihoods = []),
+                    scores = [], likelihoods = [], lens_partial = [], lens_expected = [], lens_predicted = []),
                 C(name = 'SimmonsPCA', class_ = RouteModelSimmonsPCA,
-                    scores = [], likelihoods = [])
+                    scores = [], likelihoods = [], lens_partial = [], lens_expected = [], lens_predicted = []),
                 ]
 
         results[partial_length] = route_models
@@ -334,6 +334,9 @@ def test_partial_prediction(d):
                 scores = d.scores
                 likelihoods = d.likelihoods
                 name = d.name
+                lens_partial = d.lens_partial
+                lens_expected = d.lens_expected
+                lens_predicted = d.lens_predicted
 
                 model.learn_routes(
                         list(itertools.chain(*(chunks[:cv_idx] + chunks[cv_idx + 1:]))),
@@ -353,6 +356,9 @@ def test_partial_prediction(d):
                         scores.append(score)
                         likelihoods.append(likelihood)
                         lengths.append(l)
+                        lens_partial.append(l)
+                        lens_expected.append(len(expected))
+                        lens_predicted.append(len(predicted))
 
                     except CyclicRouteException as e:
                         score = -1
@@ -391,7 +397,7 @@ def test_partial_prediction(d):
 
             plots.relation(likelihoods, scores, '/tmp/{}_likelihood_score_{}.pdf'.format(name, partial_length))
 
-
+    
 
     lst = []
     for l, rms in results.items():
@@ -401,12 +407,22 @@ def test_partial_prediction(d):
     plots.cdfs(lst, '/tmp/scores.pdf')
 
 
+    #
+    # Group things by Model (and nothing else):
+    #
+
     for i in range(len(results.values()[0])):
         ls = sorted(results.keys())
         plots.boxplots(
                 xs = ls,
                 yss = [results[l][i].scores for l in ls],
                 filename = '/tmp/{}_by_length.pdf'.format(results[l][i].name)
+                )
+
+        plots.relation(
+                itertools.chain(*[results[l][i].lens_partial for l in ls]),
+                itertools.chain(*[results[l][i].scores       for l in ls]),
+                filename = '/tmp/{}_score_by_lens_partial.pdf'.format(results[l][i].name),
                 )
 
 

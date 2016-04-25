@@ -36,10 +36,13 @@ def all_relations(a, filename):
     f.savefig(filename, dpi=100)
 
 def relation(xs, ys, filename):
-    a = np.array([xs, ys])
-    cov = np.cov(a)
+    xsl = list(xs)
+    ysl = list(ys)
+    a = np.array([xsl, ysl])
+    cor = np.corrcoef(a, rowvar=False)
+    plt.axes().arrow(0, 0, 1, cor[0, 1])
     plt.clf()
-    plt.scatter(xs, ys)
+    plt.scatter(xsl, ysl)
     plt.savefig(filename, dpi=100)
 
 def cdfs(a, filename):
@@ -49,23 +52,24 @@ def cdfs(a, filename):
 
     plt.clf()
     plt.cla()
-    for d, c in zip(a, plt.cm.Set1(np.linspace(0, 1, len(a)))):
+    for i, (d, c) in enumerate(zip(a, plt.cm.Paired(np.linspace(0, 1, len(a))))):
         values = d['values']
+        values = np.sort(values)
         avg = np.sum(values)/len(values)
         median = np.median(values)
 
         def indices_to_counts(xs, indices):
             counts = indices[1:] - indices[:-1]
-            l = len(xs) - sum(indices)
+            l = len(values) - sum(counts)
             return xs, np.hstack((counts, np.array([l])))
 
         #xs, counts = np.unique(values, return_counts = True)
         xs, counts = indices_to_counts( *np.unique(values, return_index = True) )
         ys = np.cumsum(counts)
 
-        plt.plot(xs, ys, c=c, label=d['label'])
-        plt.axvline(x = avg, color=c, linestyle=':') 
-        plt.axvline(x = median, color=c, linestyle='--') 
+        plt.plot(xs, ys, c=c, label=d['label'], linewidth=i/5+1)
+        plt.axvline(x = avg, color=c, linestyle=':', linewidth=i/5+1) 
+        plt.axvline(x = median, color=c, linestyle='--', linewidth=i/5+1) 
 
     plt.legend(loc='best', prop={'size': 8})
     plt.savefig(filename, dpi=100)
@@ -90,3 +94,32 @@ def multi_boxplots(xs, ysss, filename):
 
     plt.setp(axes, xticklabels=xs)
     fig.savefig(filename, dpi=100)
+
+
+if __name__ == '__main__':
+
+    a = [
+        { 'label': 'foo00', 'values': np.random.rand(10) },
+        { 'label': 'foo01', 'values': np.random.rand(10) },
+        { 'label': 'foo02', 'values': np.random.rand(10) },
+        { 'label': 'foo03', 'values': np.random.rand(10) },
+        { 'label': 'foo04', 'values': np.random.rand(10) },
+        { 'label': 'foo05', 'values': np.random.rand(10) },
+        { 'label': 'foo06', 'values': np.random.rand(10) },
+        { 'label': 'foo07', 'values': np.random.rand(10) },
+        { 'label': 'foo08', 'values': np.random.rand(10) },
+        { 'label': 'foo09', 'values': np.random.rand(10) },
+        { 'label': 'foo10', 'values': np.random.rand(10) },
+        { 'label': 'foo11', 'values': np.random.rand(10) },
+        { 'label': 'foo12', 'values': np.random.rand(10) },
+        { 'label': 'foo13', 'values': np.random.rand(10) },
+        { 'label': 'foo14', 'values': np.random.rand(10) },
+        { 'label': 'foo15', 'values': np.random.rand(10) },
+        { 'label': 'foo16', 'values': np.random.rand(10) },
+        { 'label': 'foo17', 'values': np.random.rand(10) },
+        { 'label': 'foo18', 'values': np.random.rand(10) },
+        { 'label': 'foo19', 'values': np.random.rand(10) },
+        
+        ]
+
+    cdfs(a, '/tmp/test.pdf')
