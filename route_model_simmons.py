@@ -94,6 +94,7 @@ class RouteModelSimmons:
         while True:
             # MLE estimate, marginalize over goals
             most_likely = self.predict_arc(partial, features, fix_g = max_arrival).most_common()
+
             if len(most_likely) < 1:
                 print("i'm lost!")
                 break

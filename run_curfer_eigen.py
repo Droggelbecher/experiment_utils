@@ -8,6 +8,7 @@ import subprocess
 import math
 import itertools
 from datetime import datetime
+import random
 
 from mpl_toolkits.mplot3d import Axes3D
 from sklearn.cluster import DBSCAN
@@ -292,11 +293,14 @@ def test_partial_prediction(d):
 
     print("total routes:", len(routes))
 
+    ziproutes = zip(routes, features)
+    random.shuffle(ziproutes)
+
 
     # Cross-validate prediction accuracy
     #
     CV_FACTOR = 10
-    chunks = list(iterutils.chunks(zip(routes, features), CV_FACTOR))
+    chunks = list(iterutils.chunks(ziproutes, CV_FACTOR))
 
 
     def jaccard(r1, r2):
@@ -369,7 +373,7 @@ def test_partial_prediction(d):
                         #plot_gmaps(partial, predicted, 'cycle_predicted')
 
 
-                    print("cv {} i {} likelihood {} score {} explen {} predlen {}".format(cv_idx, i, likelihood, score, l, len(predicted)))
+                    print("{} cv {} i {} likelihood {} score {} partial/rel {} partial/abs {} explen {} predlen {}".format(name, cv_idx, i, likelihood, score, partial_length, l, len(expected), len(predicted)))
                     plot_gmaps(partial, expected,
                             '{}_{}_{}_expected'.format(name, cv_idx, i))
                     plot_gmaps(partial, predicted,
@@ -410,8 +414,16 @@ def test_partial_prediction(d):
             xs = ls,
             ysss = [ [results[l][i].scores for l in ls] for i in range(len(route_models)) ],
             labels = [rm.name for rm in route_models],
-            ylim = (-.1, 1.1),
+            ylim = (-.05, 1.05),
             filename = '/tmp/scores_by_length.pdf'
+            )
+
+    plots.multi_boxplots(
+            xs = range(CV_FACTOR),
+            ysss = [ [results[0.25][i].scores[j*13:(j+1)*13] for j in range(CV_FACTOR)] for i in range(len(route_models)) ],
+            labels = [rm.name for rm in route_models],
+            ylim = (-.05, 1.05),
+            filename = '/tmp/scores_by_cv.pdf'
             )
 
     #
@@ -430,6 +442,25 @@ def test_partial_prediction(d):
                 itertools.chain(*[results[l][i].scores       for l in ls]),
                 filename = '/tmp/{}_score_by_lens_partial.pdf'.format(results[l][i].name),
                 )
+
+        plots.relation(
+                itertools.chain(*[results[l][i].lens_expected for l in ls]),
+                itertools.chain(*[results[l][i].scores        for l in ls]),
+                filename = '/tmp/{}_score_by_lens_expected.pdf'.format(results[l][i].name),
+                )
+
+        plots.relation(
+                itertools.chain(*[results[l][i].lens_predicted for l in ls]),
+                itertools.chain(*[results[l][i].scores         for l in ls]),
+                filename = '/tmp/{}_score_by_lens_predicted.pdf'.format(results[l][i].name),
+                )
+
+        plots.relation(
+                itertools.chain(*[results[l][i].lens_expected  for l in ls]),
+                itertools.chain(*[results[l][i].lens_predicted for l in ls]),
+                filename = '/tmp/{}_lens_expected_predicted.pdf'.format(results[l][i].name),
+                )
+
 
 
 if __name__ == '__main__':

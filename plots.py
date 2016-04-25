@@ -39,10 +39,14 @@ def relation(xs, ys, filename):
     xsl = list(xs)
     ysl = list(ys)
     a = np.array([xsl, ysl])
-    cor = np.corrcoef(a, rowvar=False)
+    cor = np.corrcoef(a, rowvar=True)
+    cov = np.cov(a)
+    print("cov=", cov)
+    print("cor=", cor)
     plt.axes().arrow(0, 0, 1, cor[0, 1])
     plt.clf()
-    plt.scatter(xsl, ysl)
+    plt.scatter(xsl, ysl, c = plt.cm.Set1(np.linspace(0, 1, len(xsl))),
+            alpha=0.5)
     plt.savefig(filename, dpi=100)
 
 def cdfs(a, filename):
