@@ -16,11 +16,18 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
 
     ARRIVAL = None
 
-    MAX_COMPONENTS = 3
+    #MAX_COMPONENTS = 3
     PCA_WEIGHTS = False
     CLUSTER_DESTINATIONS = False
     REJECT_NOISE_DESTINATIONS = False
-    INDEX_COMPONENTS = 2
+    USE_ICA = False
+    #INDEX_COMPONENTS = 2
+
+
+    def __init__(self, pca_components = 3):
+        self.MAX_COMPONENTS = pca_components
+        self.INDEX_COMPONENTS = pca_components
+        RouteModelSimmons.__init__(self)
 
     def _route_to_array(self, route, default = 0.0):
         s = set(route)
@@ -50,11 +57,13 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
 
     def _project(self, partial, features):
         a = np.hstack((self._route_to_array(partial, default = 0.5), np.array(features)))
-        return tuple(x for x in self._pca.transform(a.reshape(1, -1))[0])
+        #return tuple(x for x in self._pca.transform(a.reshape(1, -1))[0])
+        return self._pca.transform(a.reshape(1, -1))
 
     def _quantize_pc(self, v):
+        #return 0
         #return round(v, 1)
-        eps = 0 #.1
+        eps = .1
         if v < -eps:
             return -1.0
         if v > eps:
@@ -106,22 +115,33 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
 
         dummyroute, dummyfeature = self._split_route(routes[0])
 
-        self._X = np.zeros(shape = (len(routes), len(self._road_id_to_index) + len(dummyfeature)))
+        parts = 4
+        self._X = np.zeros(shape = (len(routes) * parts, len(self._road_id_to_index) + len(dummyfeature)))
 
         for i, routefeatures in enumerate(routes):
             route, features = self._split_route(routefeatures)
             if not len(route):
                 continue
-            for r in route:
-                j = self._road_id_to_index[r]
-                self._X[i, j] = 1
-            for f in features:
-                self._X[i, len(self._road_id_to_index)] = f
 
-        self._pca = PCA(n_components = self.MAX_COMPONENTS)
+            n = int(len(route)/parts)
+            for part in range(parts):
+                if part < parts - 1:
+                    route = route[:part * n]
+                for r in route:
+                    j = self._road_id_to_index[r]
+                    self._X[i, j] = 1
+
+                self._X[i, len(self._road_id_to_index):] = features
+
+        if self.USE_ICA:
+            self._pca = FastICA(n_components = self.MAX_COMPONENTS)
+        else:
+            self._pca = PCA(n_components = self.MAX_COMPONENTS)
+
         self._pca.fit(self._X)
 
-        print("variances={}".format(self._pca.explained_variance_ratio_))
+        if hasattr(self._pca, 'explained_variance_ratio_'):
+            print("variances={}".format(self._pca.explained_variance_ratio_))
 
         print("learning routes...")
         if self.CLUSTER_DESTINATIONS:

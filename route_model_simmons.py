@@ -7,7 +7,7 @@ Route model loosely modeled after the HMM approach from Simmons 2006 in
 "Learning to Predict Driver Route and Destination Intent"
 """
 
-class CyclicRouteException(Exception):
+class RouteException(Exception):
     pass
 
 
@@ -107,10 +107,10 @@ class RouteModelSimmons:
             if len(likely_allowed) < 1:
                 if not self.BACKTRACK or len(partial) <= len(partial_route):
                     print("stuck with no alternative")
-                    return partial[len(partial_route):], likelihood
-                    #e = CyclicRouteException("stuck with no alternatives!")
-                    #e.route = partial[len(partial_route):]
-                    #raise e
+                    #return partial[len(partial_route):], likelihood
+                    e = RouteException("stuck with no alternatives!")
+                    e.route = partial[len(partial_route):]
+                    raise e
                 else:
                     #print("backtracking")
                     forbidden_arcs.add(partial[-1])
@@ -129,9 +129,9 @@ class RouteModelSimmons:
             else:
                 likelihood *= float(weight) / sum(v for _, v in most_likely)
                 return partial[len(partial_route):], likelihood
-                #e = CyclicRouteException("no solution w/o cycle found, aborting route!")
-                #e.route = partial[len(partial_route):]
-                #raise e
+                e = RouteException("no solution w/o cycle found, aborting route!")
+                e.route = partial[len(partial_route):]
+                raise e
 
         return partial[len(partial_route):], likelihood
 

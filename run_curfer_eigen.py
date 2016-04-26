@@ -19,7 +19,7 @@ import numpy.linalg as LA
 
 from cache import cached, NEVER, ALWAYS
 from navkit import prepare_positioning, prepare_mapmatching, run_positioning, run_mapmatching
-from route_model_simmons import RouteModelSimmons, CyclicRouteException
+from route_model_simmons import RouteModelSimmons, RouteException
 from route_model_simmons_pca import RouteModelSimmonsPCA
 from route_model_simmons_nofeatures import RouteModelSimmonsNoFeatures
 from timer import Timer
@@ -31,13 +31,14 @@ import plots
 import route_analysis
 import ttp
 import iterutils
+import util
 from util import C
 
 np.set_printoptions(threshold=9999999999,linewidth=99999,precision=3)
 
 
 GPS_TTP_FILENAME = '/tmp/gps.ttp'
-MAX_COMPONENTS = 10
+MAX_COMPONENTS = 3
 HAVE_NAVKIT = False
 
 
@@ -121,13 +122,16 @@ def preprocess_data(curfer_directory):
 def render_road_ids(r, weights, name):
     filename = '/tmp/gmaps_{}.html'.format(name)
 
+    route = r.F.route(weights)
+
     info = [
+            'Route min: {} max: {}'.format(min(route), max(route)),
             gmaps.generate_html_bar_graph(r.F.weekdays(weights), r.F.weekdays.keys),
             gmaps.generate_html_bar_graph(r.F.hours(weights), r.F.hours.keys),
             ]
 
     lines = itertools.chain(
-                gmaps.weighted_lines(r.F.route(weights), r.endpoints),
+                gmaps.weighted_lines(route, r.endpoints),
                 gmaps.weighted_lines(r.F.arrival_arcs(weights), r.endpoints, '#ff00ff', '#000000', opacity = 1.0)
                 )
 
@@ -170,10 +174,6 @@ def cluster_routes(r):
 
         for route in routes:
             weights += route
-            #route = r.F.route(route)
-            #ep = r.endpoints[route != 0]
-            #trips.extend(ep)
-            #trip_colors.extend([rgb2hex(c)] * len(ep))
 
         weights /= len(routes)
 
@@ -255,11 +255,55 @@ def analyze(r):
 
 
 
+
+def jaccard(r1, r2):
+    s1 = set(r1)
+    s2 = set(r2)
+    union = s1.union(s2)
+    if len(union) == 0:
+        return 0
+    return len(s1.intersection(s2)) / float(len(union))
+
+def eval_metric(predicted, expected):
+    IGNORE_LAST_ARCS = 5
+    return jaccard(predicted[:-IGNORE_LAST_ARCS], expected[:-IGNORE_LAST_ARCS])
+
+def test_predict_route(model, partial, expected, features, stats):
+    stats['length_partial'].append(len(partial))
+    stats['length_expected'].append(len(expected))
+
+    try:
+        predicted, likelihood = model.predict_route(partial, features)
+
+    except RouteException as e:
+        predicted = e.route
+        likelihood = 0
+        stats['exception'].append(1)
+
+    else:
+        stats['exception'].append(0)
+
+    score = eval_metric(predicted, expected)
+
+    stats['likelihood'].append(likelihood)
+    stats['score'].append(score)
+    stats['length_predicted'].append(len(predicted))
+
+    return predicted
+
+
+
+
+
+
 def test_partial_prediction(d):
     road_ids_to_endpoints = d['road_ids_to_endpoints']
 
 
     def plot_gmaps(partial, continuation, name, **kws):
+        """
+        Plot on a gmap a partial route and its continuation.
+        """
         lines = gmaps.line_sets([
             [road_ids_to_endpoints[x[0]] for x in partial],
             [road_ids_to_endpoints[x[0]] for x in continuation],
@@ -272,212 +316,170 @@ def test_partial_prediction(d):
         f.close()
 
 
+    with Timer("preparation"):
 
-    # Preprocess routes:
-    # 1. assign directions
-    # 2. remove duplicates (so routes contain no cycles)
-    routes = [
-                list(route_analysis.remove_duplicates(route_analysis.to_directed_arcs(route, coordinate_route, road_ids_to_endpoints)))
-            for route, coordinate_route, departure_time in
-            zip(d['routes'], d['coordinate_routes'], d['departure_times'])
-            ]
+        # Preprocess routes:
+        # 1. assign directions
+        # 2. remove duplicates (so routes contain no cycles)
+        routes = [
+                    list(route_analysis.remove_duplicates(route_analysis.to_directed_arcs(route, coordinate_route, road_ids_to_endpoints)))
+                for route, coordinate_route, departure_time in
+                zip(d['routes'], d['coordinate_routes'], d['departure_times'])
+                ]
 
-    features = [] #np.zeros((len(routes), 24 + 7))
-    for i, departure_time in enumerate(d['departure_times']):
-        f = np.zeros(7 + 24)
-        if departure_time is not None:
-            dt = datetime.utcfromtimestamp(departure_time)
-            f[dt.weekday()] = 1.0
-            f[7 + dt.hour] = 1.0
-        features.append(f)
+        # Compute feature vectors (weekday & time of day)
 
-    print("total routes:", len(routes))
+        features = [] 
+        for i, departure_time in enumerate(d['departure_times']):
+            f = np.zeros(7 + 24)
+            if departure_time is not None:
+                dt = datetime.utcfromtimestamp(departure_time)
+                f[dt.weekday()] = 1.0
+                f[7 + dt.hour] = 1.0
+            features.append(f)
 
-    ziproutes = zip(routes, features)
-    random.shuffle(ziproutes)
+        print("total routes:", len(routes))
 
-
-    # Cross-validate prediction accuracy
-    #
-    CV_FACTOR = 10
-    chunks = list(iterutils.chunks(ziproutes, CV_FACTOR))
+        ziproutes = zip(routes, features)
+        random.shuffle(ziproutes)
 
 
-    def jaccard(r1, r2):
-        s1 = set(r1)
-        s2 = set(r2)
-        union = s1.union(s2)
-        if len(union) == 0:
-            return 0
-        return len(s1.intersection(s2)) / float(len(union))
+        # Cross-validate prediction accuracy
+        #
+        CV_FACTOR = 10
+        chunks = list(iterutils.chunks(ziproutes, CV_FACTOR))
 
-    def eval_metric(predicted, expected):
-        IGNORE_LAST_ARCS = 5
-        return jaccard(predicted[:-IGNORE_LAST_ARCS], expected[:-IGNORE_LAST_ARCS])
 
-    results = {}
+        results = {}
 
     for partial_length in (0.0, 0.25, 0.5, 0.75):
         route_models = [
-                C(name = 'SimmonsNoF', class_ = RouteModelSimmonsNoFeatures, scores = [], likelihoods = [], lens_partial = [], lens_expected = [], lens_predicted = []),
-                C(name = 'Simmons',    class_ = RouteModelSimmons,           scores = [], likelihoods = [], lens_partial = [], lens_expected = [], lens_predicted = []),
-                C(name = 'SimmonsPCA', class_ = RouteModelSimmonsPCA,        scores = [], likelihoods = [], lens_partial = [], lens_expected = [], lens_predicted = []),
+                C(name = 'SimmonsNoF',  make = RouteModelSimmonsNoFeatures,     stats = util.listdict()),
+                #C(name = 'Simmons',     make = RouteModelSimmons,               stats = util.listdict()),
+                C(name = 'SimmonsPCA1', make = lambda: RouteModelSimmonsPCA(1), stats = util.listdict()),
+                #C(name = 'SimmonsPCA2', make = lambda: RouteModelSimmonsPCA(2), stats = util.listdict()),
+                C(name = 'SimmonsPCA3', make = lambda: RouteModelSimmonsPCA(3), stats = util.listdict()),
+                C(name = 'SimmonsPCA10', make = lambda: RouteModelSimmonsPCA(10), stats = util.listdict()),
                 ]
-
         results[partial_length] = route_models
 
-        lengths = []
         for cv_idx in range(CV_FACTOR):
             print("cv_idx={} routes={}".format(cv_idx, len(chunks[cv_idx])))
 
             for d in route_models:
-                model = d.class_()
-                scores = d.scores
-                likelihoods = d.likelihoods
-                name = d.name
-                lens_partial = d.lens_partial
-                lens_expected = d.lens_expected
-                lens_predicted = d.lens_predicted
 
-                model.learn_routes(
-                        list(itertools.chain(*(chunks[:cv_idx] + chunks[cv_idx + 1:]))),
-                        road_ids_to_endpoints,
-                        )
+                with Timer('{} {}/{}'.format(d.name, cv_idx, CV_FACTOR)):
 
-                for i, (route, features) in enumerate(chunks[cv_idx]):
-                    l = int(partial_length * len(route))
-                    l = max(l, 1)
-                    partial = route[:l]
-                    expected = route[l:]
-                    predicted = []
+                    # train on all chunks but cv_idx
+                    
+                    model = d.make()
+                    routes = list(itertools.chain(*(chunks[:cv_idx] + chunks[cv_idx + 1:])))
+                    model.learn_routes(routes, road_ids_to_endpoints)
 
-                    try:
-                        predicted, likelihood = model.predict_route(partial, features)
-                        score = eval_metric(predicted, expected)
-                        scores.append(score)
-                        likelihoods.append(likelihood)
-                        lengths.append(l)
-                        lens_partial.append(l)
-                        lens_expected.append(len(expected))
-                        lens_predicted.append(len(predicted))
+                    # evaluate on cv_idx
 
-                    except CyclicRouteException as e:
-                        scores.append(0)
-                        likelihoods.append(0)
-                        lengths.append(l)
-                        lens_partial.append(l)
-                        lens_expected.append(len(expected))
-                        lens_predicted.append(0)
+                    for i, (route, features) in enumerate(chunks[cv_idx]):
 
-                        score = -1
-                        likelihood = -1
-                        predicted = e.route
-                        print(e)
-                        print('route=', e.route)
-                        sys.stdout.flush()
-                        #predicted = e.route
-                        #plot_gmaps(partial, expected, 'cycle_expected')
-                        #plot_gmaps(partial, predicted, 'cycle_predicted')
+                        l = max(1, int(partial_length * len(route)))
+                        expected = route[l:]
+
+                        # As a ground for comparison find out the best possible
+                        # score the test route can achieve (that is max similarity
+                        # to any known route):
+                        s_max = 0
+                        for (route2, f2) in routes:
+                            s = eval_metric(expected, route2[l:])
+                            if s > s_max:
+                                s_max = s
+                                # Ok, we got it, we should be able to predict this
+                                # one pretty well
+                                if s_max >= .99:
+                                    break
+
+                        if s_max < 0.8:
+                            continue
+
+                        d.stats['test_route_score'].append(s_max)
 
 
-                    print("{} cv {} i {} likelihood {} score {} partial/rel {} partial/abs {} explen {} predlen {}".format(name, cv_idx, i, likelihood, score, partial_length, l, len(expected), len(predicted)))
-                    plot_gmaps(partial, expected,
-                            '{}_{}_{}_expected'.format(name, cv_idx, i))
-                    plot_gmaps(partial, predicted,
-                            '{}_{}_{}_predicted'.format(name, cv_idx, i),
-                            likelihood = likelihood,
-                            score = score)
 
+                        partial = route[:l]
+                        predicted = test_predict_route(model, partial, expected, features, d.stats)
+
+                        print("{} cv {} i {} likelihood {} score {} partial/rel {} partial/abs {} explen {} predlen {}".format(
+                            d.name, cv_idx, i,
+                            d.stats['likelihood'][-1],
+                            d.stats['score'][-1],
+                            partial_length,
+                            l,
+                            len(expected),
+                            len(predicted)))
+
+                        plot_gmaps(partial, expected, '{}_{}_{}_expected'.format(d.name, cv_idx, i))
+                        plot_gmaps(partial, predicted, '{}_{}_{}_predicted'.format(d.name, cv_idx, i),
+                                likelihood = d.stats['likelihood'][-1],
+                                score = d.stats['score'][-1])
+
+    with Timer("plotting"):
         
-        print("prediction lengths min {:5d} avg {:7.3f} max {:5d}".format(
-            min(lengths), sum(lengths)/len(lengths), max(lengths)))
+        for partial_length, route_models in results.items():
+            for d in route_models:
+                scores = d.stats['score']
 
-    for partial_length, route_models in results.items():
-        for d in route_models:
-            scores = d.scores
-            likelihoods = d.likelihoods
-            name = d.name
+                print("total partial length {:5.4f} {:20s} score/jaccard min {:5.4f} avg {:5.4f} max {:5.4f}".format(
+                    partial_length,
+                    d.name,
+                    min(scores), sum(scores)/len(scores), max(scores)))
 
-            print("total partial length {:5.4f} {:20s} score/jaccard min {:5.4f} avg {:5.4f} max {:5.4f}".format(
-                partial_length,
-                name,
-                min(scores), sum(scores)/len(scores), max(scores)))
+                #likelihoods = d.stats['likelihood']
+                #plots.relation(likelihoods, scores, '/tmp/{}_likelihood_score_{}.pdf'.format(d.name, partial_length))
 
-            plots.relation(likelihoods, scores, '/tmp/{}_likelihood_score_{}.pdf'.format(name, partial_length))
+                plots.relation(d.stats['test_route_score'], d.stats['score'], '/tmp/{}_{}_rel_score.pdf'.format(d.name, partial_length))
+        
 
-    
+        #lst = []
+        #for l, rms in results.items():
+            #for d in rms:
+                #lst.append(dict(label = '{}_{}'.format(d.name, l), values = d.stats['score']))
+        #plots.cdfs(lst, '/tmp/scores.pdf')
 
-    lst = []
-    for l, rms in results.items():
-        for d in rms:
-            lst.append(dict(label = '{}_{}'.format(d.name, l), values = d.scores))
+        ls = sorted(results.keys())
 
-    plots.cdfs(lst, '/tmp/scores.pdf')
-
-
-    ls = sorted(results.keys())
-
-    plots.multi_boxplots(
-            xs = ls,
-            ysss = [ [results[l][i].scores for l in ls] for i in range(len(route_models)) ],
-            labels = [rm.name for rm in route_models],
-            ylim = (-.05, 1.05),
-            filename = '/tmp/scores_by_length.pdf'
-            )
-
-    plots.multi_boxplots(
-            xs = range(CV_FACTOR),
-            ysss = [ [results[0.25][i].scores[j*13:(j+1)*13] for j in range(CV_FACTOR)] for i in range(len(route_models)) ],
-            labels = [rm.name for rm in route_models],
-            ylim = (-.05, 1.05),
-            filename = '/tmp/scores_by_cv.pdf'
-            )
-
-    #
-    # Group things by Model (and nothing else):
-    #
-
-    for i in range(len(results.values()[0])):
-        #plots.boxplots(
-                #xs = ls,
-                #yss = [results[l][i].scores for l in ls],
-                #filename = '/tmp/{}_by_length.pdf'.format(results[l][i].name)
-                #)
-
-        plots.relation(
-                itertools.chain(*[results[l][i].lens_partial for l in ls]),
-                itertools.chain(*[results[l][i].scores       for l in ls]),
-                filename = '/tmp/{}_score_by_lens_partial.pdf'.format(results[l][i].name),
-                )
-
-        plots.relation(
-                itertools.chain(*[results[l][i].lens_expected for l in ls]),
-                itertools.chain(*[results[l][i].scores        for l in ls]),
-                filename = '/tmp/{}_score_by_lens_expected.pdf'.format(results[l][i].name),
-                )
-
-        plots.relation(
-                itertools.chain(*[results[l][i].lens_predicted for l in ls]),
-                itertools.chain(*[results[l][i].scores         for l in ls]),
-                filename = '/tmp/{}_score_by_lens_predicted.pdf'.format(results[l][i].name),
-                )
-
-        plots.relation(
-                itertools.chain(*[results[l][i].lens_expected  for l in ls]),
-                itertools.chain(*[results[l][i].lens_predicted for l in ls]),
-                filename = '/tmp/{}_lens_expected_predicted.pdf'.format(results[l][i].name),
+        plots.multi_boxplots(
+                xs = ls,
+                ysss = [ [results[l][i].stats['score'] for l in ls] for i in range(len(route_models)) ],
+                labels = [rm.name for rm in route_models],
+                ylim = (-.05, 1.05),
+                filename = '/tmp/scores_by_length.pdf'
                 )
 
 
+        #
+        # Group things by Model (and nothing else):
+        #
+
+        for i in range(len(results.values()[0])):
+
+            a = np.array([
+                    list(itertools.chain(*[results[l][i].stats['length_partial'] for l in ls])),
+                    list(itertools.chain(*[results[l][i].stats['length_expected'] for l in ls])),
+                    list(itertools.chain(*[results[l][i].stats['length_predicted'] for l in ls])),
+                    list(itertools.chain(*[results[l][i].stats['likelihood'] for l in ls])),
+                    list(itertools.chain(*[results[l][i].stats['score'] for l in ls])),
+                    #list(itertools.chain(*[results[l][i].stats['exception'] for l in ls])),
+                    list(itertools.chain(*[results[l][i].stats['test_route_score'] for l in ls])),
+                    ]).T
+
+            plots.all_relations(a, '/tmp/{}_stats.pdf'.format(route_models[i].name),
+                labels = ['l(part)', 'l(exp)', 'l(pred)', 'likely', 'score', 'route score'])
 
 if __name__ == '__main__':
     d = preprocess_data(sys.argv[1])
 
-    #train_simmons(d)
     test_partial_prediction(d)
 
-    # r = route_analysis.Routes(d)
-    # analyze(r)
+    #r = route_analysis.Routes(d)
+    #analyze(r)
 
 
     print('\n'.join(Timer.pop_log()))
