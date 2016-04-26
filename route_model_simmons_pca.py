@@ -29,13 +29,13 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
         self.INDEX_COMPONENTS = pca_components
         RouteModelSimmons.__init__(self)
 
-    def _route_to_array(self, route, default = 0.0):
+    def _route_to_array(self, route, features, default = 0.0):
         s = set(route)
         r = np.full(len(self._road_id_to_index), default)
         for id_ in s:
             idx = self._road_id_to_index[id_]
             r[idx] = 1
-        return r
+        return np.hstack((r, np.array(features)))
 
     def _index(self, partial, features):
         """
@@ -47,7 +47,7 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
 
         else:
 
-            a = np.hstack((self._route_to_array(partial, default = 0.5), np.array(features)))
+            a = self._route_to_array(partial, default = 0.5, features = features)
             if len(partial):
                 p = partial[-1]
             else:
@@ -56,13 +56,13 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
             return r
 
     def _project(self, partial, features):
-        a = np.hstack((self._route_to_array(partial, default = 0.5), np.array(features)))
+        a = self._route_to_array(partial, default = 0.5, features = features)
         #return tuple(x for x in self._pca.transform(a.reshape(1, -1))[0])
         return self._pca.transform(a.reshape(1, -1))
 
     def _quantize_pc(self, v):
         #return 0
-        #return round(v, 1)
+        return round(v, 1)
         eps = .1
         if v < -eps:
             return -1.0
@@ -125,21 +125,18 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
                 continue
 
             if parts == 1:
-                for r in route:
-                    j = self._road_id_to_index[r]
-                    self._X[i, j] = 1
-                self._X[i, len(self._road_id_to_index):] = features
+                self._X[i,:] = self._route_to_array(route, features)
 
             else:
                 n = int(len(route)/parts)
                 for part in range(parts):
                     if part < parts - 1:
                         route = route[:part * n]
-                    for r in route:
-                        j = self._road_id_to_index[r]
-                        self._X[i * parts + part, j] = 1
 
-                    self._X[i * parts + part, len(self._road_id_to_index):] = features
+                    self._X[i * parts + part, :] = self._route_to_array(route, features)
+
+        print("_X=", self._X)
+        print("_X.shape=", self._X.shape)
 
         if self.USE_ICA:
             self._pca = FastICA(n_components = self.MAX_COMPONENTS)
