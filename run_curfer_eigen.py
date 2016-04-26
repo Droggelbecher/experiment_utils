@@ -356,10 +356,10 @@ def test_partial_prediction(d):
         route_models = [
                 C(name = 'SimmonsNoF',  make = RouteModelSimmonsNoFeatures,     stats = util.listdict()),
                 #C(name = 'Simmons',     make = RouteModelSimmons,               stats = util.listdict()),
-                C(name = 'SimmonsPCA1', make = lambda: RouteModelSimmonsPCA(1), stats = util.listdict()),
+                C(name = 'SimmonsPCA1', make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1)), stats = util.listdict()),
                 #C(name = 'SimmonsPCA2', make = lambda: RouteModelSimmonsPCA(2), stats = util.listdict()),
-                C(name = 'SimmonsPCA3', make = lambda: RouteModelSimmonsPCA(3), stats = util.listdict()),
-                C(name = 'SimmonsPCA10', make = lambda: RouteModelSimmonsPCA(10), stats = util.listdict()),
+                C(name = 'SimmonsPCA3', make = lambda: RouteModelSimmonsPCA(PCA(n_components = 3)), stats = util.listdict()),
+                #C(name = 'SimmonsPCA10', make = lambda: RouteModelSimmonsPCA(PCA(10)), stats = util.listdict()),
                 ]
         results[partial_length] = route_models
 

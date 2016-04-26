@@ -9,6 +9,7 @@ from sklearn.cluster import DBSCAN
 
 import geo
 import gmaps
+import plots
 
 from route_model_simmons import RouteModelSimmons
 
@@ -16,17 +17,13 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
 
     ARRIVAL = None
 
-    #MAX_COMPONENTS = 3
     PCA_WEIGHTS = False
     CLUSTER_DESTINATIONS = False
     REJECT_NOISE_DESTINATIONS = False
-    USE_ICA = False
-    #INDEX_COMPONENTS = 2
 
-
-    def __init__(self, pca_components = 3):
-        self.MAX_COMPONENTS = pca_components
-        self.INDEX_COMPONENTS = pca_components
+    def __init__(self, decompositor = PCA(n_components = 3)):
+        self._decompositor = decompositor
+        self._pca_route_parts = 1
         RouteModelSimmons.__init__(self)
 
     def _route_to_array(self, route, features, default = 0.0):
@@ -42,7 +39,7 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
         Turn given partial route into a hash table index
         """
 
-        if self.INDEX_COMPONENTS == 0:
+        if self._decompositor is None:
             return RouteModelSimmons._index(self, partial, features)
 
         else:
@@ -52,17 +49,15 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
                 p = partial[-1]
             else:
                 p = -1
-            r = (p,) + tuple(self._quantize_pc(x) for x in self._pca.transform(a.reshape(1, -1))[0,:self.INDEX_COMPONENTS])
+            r = (p,) + tuple(self._quantize_pc(x) for x in self._decompositor.transform(a.reshape(1, -1))[0,:])
             return r
 
     def _project(self, partial, features):
         a = self._route_to_array(partial, default = 0.5, features = features)
-        #return tuple(x for x in self._pca.transform(a.reshape(1, -1))[0])
-        return self._pca.transform(a.reshape(1, -1))
+        return self._decompositor.transform(a.reshape(1, -1))
 
     def _quantize_pc(self, v):
-        #return 0
-        return round(v, 1)
+        #return round(v, 1)
         eps = .1
         if v < -eps:
             return -1.0
@@ -115,38 +110,43 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
 
         dummyroute, dummyfeature = self._split_route(routes[0])
 
-        self._pca_route_parts = 4
         parts = self._pca_route_parts
         self._X = np.zeros(shape = (len(routes) * parts, len(self._road_id_to_index) + len(dummyfeature)))
 
+        rta = self._route_to_array
+        X = self._X
+
         for i, routefeatures in enumerate(routes):
             route, features = self._split_route(routefeatures)
+            #print("len(route)=", len(route), " parts=", parts)
             if not len(route):
                 continue
 
             if parts == 1:
-                self._X[i,:] = self._route_to_array(route, features)
+                X[i,:] = rta(route, features)
 
             else:
                 n = int(len(route)/parts)
                 for part in range(parts):
+                    #print('route=', len(route))
                     if part < parts - 1:
-                        route = route[:part * n]
+                        route2 = route[:(part+1) * n]
 
-                    self._X[i * parts + part, :] = self._route_to_array(route, features)
+                    #print('part=', part, 'n=', n, 'route=', len(route2))
 
-        print("_X=", self._X)
-        print("_X.shape=", self._X.shape)
+                    X[i * parts + part, :] = rta(route2, features)
 
-        if self.USE_ICA:
-            self._pca = FastICA(n_components = self.MAX_COMPONENTS)
-        else:
-            self._pca = PCA(n_components = self.MAX_COMPONENTS)
+        #print("_X=", self._X)
+        #print(np.where(X != 0))
+        #print("_X.shape=", self._X.shape)
 
-        self._pca.fit(self._X)
+        #plots.matrix(X, '/tmp/X.png')
+        #sys.exit(1)
 
-        if hasattr(self._pca, 'explained_variance_ratio_'):
-            print("variances={}".format(self._pca.explained_variance_ratio_))
+        self._decompositor.fit(self._X)
+
+        if hasattr(self._decompositor, 'explained_variance_ratio_'):
+            print("variances={}".format(self._decompositor.explained_variance_ratio_))
 
         print("learning routes...")
         if self.CLUSTER_DESTINATIONS:
@@ -168,7 +168,7 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
         returns: { route_id: count, ... }
         """
         arrivals = self.predict_arrival(partial_route, features)
-        pc_weights = self._pca.inverse_transform(self._project(partial_route, features))
+        pc_weights = self._decompositor.inverse_transform(self._project(partial_route, features))
         r = Counter()
 
         for l, g, m in self._pls[ self._index(partial_route, features) ]:
