@@ -31,7 +31,7 @@ class Routes:
 
         self.F = Features(
                 Feature('weekdays',  ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'], weight = 0.0),
-                Feature('hours',     np.arange(0, 24, 0.5),                      weight = 0.0),
+                Feature('hours',     np.arange(0, 24, 1.0),                      weight = 0.0),
                 Feature('arrival',   ('lat', 'lon'),                             weight = 0.2),
                 Feature('departure', ('lat', 'lon'),                             weight = 0.0),
                 Feature('route',     sorted_road_ids,                            weight = 0.8),
