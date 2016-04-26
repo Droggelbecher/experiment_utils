@@ -1,9 +1,11 @@
-*~
-__pycache__
+*.bak
 *.pyc
+*.swp
+*.ttp
+*~
+.DS_Store
+__pycache__
 _cache
 log.txt
-*.ttp
+log_*.txt
 tracking_pb2.py
-*.swp
-.DS_Store
