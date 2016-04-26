@@ -7,30 +7,42 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 
-def all_relations(a, filename):
+def all_relations(a, filename, labels = None):
     """
     a: np array, rows for data, columns for features/axes
     """
 
     plt.clf()
     features = a.shape[1]
-    f, axs = plt.subplots(features - 1, features - 1, squeeze=False, sharex=True, sharey=True)
+    f, axs = plt.subplots(features - 1, features - 1, squeeze=False) #, sharex=True, sharey=True)
 
+    if labels is None:
+        labels = [str(x) for x in range(features)]
+
+    #plt.xlim((np.min(a), np.max(a)))
+    #plt.ylim((np.min(a), np.max(a)))
     for row in range(1, features):
         for column in range(features - 1):
             if column < row:
                 axs[row - 1, column].scatter(a[:,column], a[:,row], alpha = 0.5, c=np.arange(a.shape[0]))
-                axs[row - 1, column].set_xlabel(str(column))
-                axs[row - 1, column].set_ylabel(str(row))
-                axs[row - 1, column].get_xaxis().set_ticks([])
-                axs[row - 1, column].get_yaxis().set_ticks([])
+
+                if column > 0:
+                    axs[row - 1, column].get_yaxis().set_ticks([])
+                else:
+                    axs[row - 1, column].set_ylabel(labels[row])
+
+                if row < features - 1: 
+                    axs[row - 1, column].get_xaxis().set_ticks([])
+                else:
+                    axs[row - 1, column].set_xlabel(labels[column])
+
+                axs[row - 1, column].set_xlim((np.min(a[:,column]), np.max(a[:,column])))
+                axs[row - 1, column].set_ylim((np.min(a[:,row]), np.max(a[:,row])))
             else:
                 axs[row - 1, column].axis('off')
 
 
     #plt.autoscale()
-    plt.xlim((np.min(a), np.max(a)))
-    plt.ylim((np.min(a), np.max(a)))
 
     f.set_size_inches((2*features, 2*features))
     f.savefig(filename, dpi=100)
@@ -39,11 +51,11 @@ def relation(xs, ys, filename):
     xsl = list(xs)
     ysl = list(ys)
     a = np.array([xsl, ysl])
-    cor = np.corrcoef(a, rowvar=True)
-    cov = np.cov(a)
-    print("cov=", cov)
-    print("cor=", cor)
-    plt.axes().arrow(0, 0, 1, cor[0, 1])
+    #cor = np.corrcoef(a, rowvar=True)
+    #cov = np.cov(a)
+    #print("cov=", cov)
+    #print("cor=", cor)
+    #plt.axes().arrow(0, 0, 1, cor[0, 1])
     plt.clf()
     plt.scatter(xsl, ysl, c = plt.cm.Set1(np.linspace(0, 1, len(xsl))),
             alpha=0.5)
