@@ -115,7 +115,8 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
 
         dummyroute, dummyfeature = self._split_route(routes[0])
 
-        parts = 4
+        self._pca_route_parts = 4
+        parts = self._pca_route_parts
         self._X = np.zeros(shape = (len(routes) * parts, len(self._road_id_to_index) + len(dummyfeature)))
 
         for i, routefeatures in enumerate(routes):
@@ -123,15 +124,22 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
             if not len(route):
                 continue
 
-            n = int(len(route)/parts)
-            for part in range(parts):
-                if part < parts - 1:
-                    route = route[:part * n]
+            if parts == 1:
                 for r in route:
                     j = self._road_id_to_index[r]
                     self._X[i, j] = 1
-
                 self._X[i, len(self._road_id_to_index):] = features
+
+            else:
+                n = int(len(route)/parts)
+                for part in range(parts):
+                    if part < parts - 1:
+                        route = route[:part * n]
+                    for r in route:
+                        j = self._road_id_to_index[r]
+                        self._X[i * parts + part, j] = 1
+
+                    self._X[i * parts + part, len(self._road_id_to_index):] = features
 
         if self.USE_ICA:
             self._pca = FastICA(n_components = self.MAX_COMPONENTS)
