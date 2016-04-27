@@ -357,14 +357,14 @@ def test_partial_prediction(d):
         results = {}
 
     #for partial_length in (0.0, 0.25, 0.5, 0.75):
-    for partial_length in (0.0, 0.1, 0.2, 0.3): # 0.25, 0.5, 0.75):
+    for partial_length in (0.0, 0.1, 0.2, 0.3):
+    #for partial_length in (0.1,):
         route_models = [
                 C(name = 'SimmonsNoF',  make = RouteModelSimmonsNoFeatures,     stats = util.listdict()),
                 #C(name = 'Simmons',     make = RouteModelSimmons,               stats = util.listdict()),
                 C(name = 'SimmonsPCA1', make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1)), stats = util.listdict()),
-                #C(name = 'SimmonsPCA2', make = lambda: RouteModelSimmonsPCA(2), stats = util.listdict()),
+                #C(name = 'SimmonsPCA2', make = lambda: RouteModelSimmonsPCA(PCA(n_components = 2)), stats = util.listdict()),
                 #C(name = 'SimmonsPCA3', make = lambda: RouteModelSimmonsPCA(PCA(n_components = 3)), stats = util.listdict()),
-                #C(name = 'SimmonsPCA10', make = lambda: RouteModelSimmonsPCA(PCA(10)), stats = util.listdict()),
 
                 # Is great (that is, slightly better than PCA, exactly as good
                 # as NoF [ :( ], costs a long time to compute (~5-7min per CV)
@@ -439,8 +439,6 @@ def test_partial_prediction(d):
 
                         d.stats['test_route_score'].append(s_max)
 
-                        print("l=", l, "best=", route_max)
-
                         partial = route[:l]
                         predicted = test_predict_route(model, partial, expected, features, d.stats)
 
@@ -482,17 +480,8 @@ def test_partial_prediction(d):
                     d.name,
                     min(scores), sum(scores)/len(scores), max(scores)))
 
-                #likelihoods = d.stats['likelihood']
-                #plots.relation(likelihoods, scores, '/tmp/{}_likelihood_score_{}.pdf'.format(d.name, partial_length))
-
                 plots.relation(d.stats['test_route_score'], d.stats['score'], '/tmp/{}_{}_rel_score.pdf'.format(d.name, partial_length))
         
-
-        #lst = []
-        #for l, rms in results.items():
-            #for d in rms:
-                #lst.append(dict(label = '{}_{}'.format(d.name, l), values = d.stats['score']))
-        #plots.cdfs(lst, '/tmp/scores.pdf')
 
         ls = sorted(results.keys())
 

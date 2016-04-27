@@ -30,6 +30,8 @@ class RouteModelSimmons:
         # m = count
         self._pgl = defaultdict(Counter)
 
+        self._accept_wrong_arrival = True
+
     def _split_route(self, route):
         return route[0], route[1]
 
@@ -112,23 +114,12 @@ class RouteModelSimmons:
             #print("likely_allowed", likely_allowed)
 
 
-            if len(likely_allowed) < 1:
-                if not self.BACKTRACK or len(partial) <= len(partial_route):
-                    #print("stuck with no alternative")
-                    #return partial[len(partial_route):], likelihood
-                    e = RouteException("stuck with no alternatives!")
-                    e.route = partial[len(partial_route):]
-                    raise e
-                else:
-                    #print("backtracking")
-                    forbidden_arcs.add(partial[-1])
-                    del partial[-1]
-                    continue
+            #if len(likely_allowed) < 1:
 
             for i, (route_id, weight) in enumerate(likely_allowed):
                 if route_id is self.ARRIVAL:
-                    if max_arrival is None or route_id == max_arrival:
-                        #print("max arrival found")
+                    if max_arrival is None or route_id == max_arrival or self._accept_wrong_arrival:
+                        print("arrival found. correct={}".format(route_id == max_arrival))
                         likelihood *= float(weight) / sum(v for _, v in most_likely)
                         return partial[len(partial_route):], likelihood
                     else:
@@ -141,12 +132,28 @@ class RouteModelSimmons:
                     partial.append(route_id)
                     break
             else:
-                print("no cycle-free solution")
-                likelihood *= float(weight) / sum(v for _, v in most_likely)
-                #return partial[len(partial_route):], likelihood
-                e = RouteException("no solution w/o cycle found, aborting route!")
-                e.route = partial[len(partial_route):]
-                raise e
+                if not self.BACKTRACK or len(partial) <= len(partial_route):
+                    print("[E] stuck with no alternative")
+                    print("partial[-1]:", partial[-1])
+                    print("partial[l:]:", partial[len(partial_route):])
+                    print("max. arrival:", max_arrival)
+                    print("allowed:", likely_allowed)
+                    print("forbidden:", forbidden_arcs)
+                    #return partial[len(partial_route):], likelihood
+                    e = RouteException("stuck with no alternatives!")
+                    e.route = partial[len(partial_route):]
+                    raise e
+                else:
+                    #print("backtracking")
+                    forbidden_arcs.add(partial[-1])
+                    del partial[-1]
+                    continue
+                #print("[E] no cycle-free solution")
+                #likelihood *= float(weight) / sum(v for _, v in most_likely)
+                ##return partial[len(partial_route):], likelihood
+                #e = RouteException("no solution w/o cycle found, aborting route!")
+                #e.route = partial[len(partial_route):]
+                #raise e
 
         return partial[len(partial_route):], likelihood
 
