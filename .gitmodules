@@ -1,0 +1,3 @@
+[submodule "sklearn_autoencoder"]
+	path = sklearn_autoencoder
+	url = https://github.com/andrecosta90/sklearn-autoencoder.git

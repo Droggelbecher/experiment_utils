@@ -17,6 +17,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy.linalg as LA
 
+sys.path.append('sklearn_autoencoder')
+from autoencoder import DenoisingAutoencoder
+
 from cache import cached, NEVER, ALWAYS
 from navkit import prepare_positioning, prepare_mapmatching, run_positioning, run_mapmatching
 from route_model_simmons import RouteModelSimmons, RouteException
@@ -358,8 +361,9 @@ def test_partial_prediction(d):
                 #C(name = 'Simmons',     make = RouteModelSimmons,               stats = util.listdict()),
                 C(name = 'SimmonsPCA1', make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1)), stats = util.listdict()),
                 #C(name = 'SimmonsPCA2', make = lambda: RouteModelSimmonsPCA(2), stats = util.listdict()),
-                C(name = 'SimmonsPCA3', make = lambda: RouteModelSimmonsPCA(PCA(n_components = 3)), stats = util.listdict()),
+                #C(name = 'SimmonsPCA3', make = lambda: RouteModelSimmonsPCA(PCA(n_components = 3)), stats = util.listdict()),
                 #C(name = 'SimmonsPCA10', make = lambda: RouteModelSimmonsPCA(PCA(10)), stats = util.listdict()),
+                C(name = 'SimmonsAutoEnc10', make = lambda: RouteModelSimmonsPCA(DenoisingAutoencoder(10)), stats = util.listdict()),
                 ]
         results[partial_length] = route_models
 

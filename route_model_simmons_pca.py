@@ -33,6 +33,7 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
             idx = self._road_id_to_index[id_]
             r[idx] = 1
         return np.hstack((r, np.array(features)))
+        #return np.hstack((np.zeros(len(self._road_id_to_index)), np.array(features)))
 
     def _index(self, partial, features):
         """
@@ -168,7 +169,8 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
         returns: { route_id: count, ... }
         """
         arrivals = self.predict_arrival(partial_route, features)
-        pc_weights = self._decompositor.inverse_transform(self._project(partial_route, features))
+        if self.PCA_WEIGHTS:
+            pc_weights = self._decompositor.inverse_transform(self._project(partial_route, features))
         r = Counter()
 
         for l, g, m in self._pls[ self._index(partial_route, features) ]:
