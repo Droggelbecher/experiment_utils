@@ -88,33 +88,17 @@ class RouteModelSimmons:
         likelihood = 1.0
         arrivals = self.predict_arrival(partial_route, features)
 
-        #print("-- predict_route")
-        #print("index=", self._index(partial_route, features))
-        #print("partial=", partial_route)
-        #print("likely arrivals=", arrivals)
-
         if len(arrivals) > 0:
             max_arrival = arrivals.most_common()[0][0]
         else:
             max_arrival = None
 
-        #print("max_arrival=", max_arrival)
-
         forbidden_arcs = set()
-
-        #print("max_arrival", max_arrival)
-
         while True:
             #print(partial[len(partial_route):])
             # MLE estimate, marginalize over goals
             most_likely = self.predict_arc(partial, features, fix_g = max_arrival).most_common()
             likely_allowed = [(k, v) for (k, v) in most_likely if k not in forbidden_arcs]
-
-            #print("most_likely", most_likely)
-            #print("likely_allowed", likely_allowed)
-
-
-            #if len(likely_allowed) < 1:
 
             for i, (route_id, weight) in enumerate(likely_allowed):
                 if route_id is self.ARRIVAL:
@@ -139,7 +123,6 @@ class RouteModelSimmons:
                     print("max. arrival:", max_arrival)
                     print("allowed:", likely_allowed)
                     print("forbidden:", forbidden_arcs)
-                    #return partial[len(partial_route):], likelihood
                     e = RouteException("stuck with no alternatives!")
                     e.route = partial[len(partial_route):]
                     raise e
@@ -148,12 +131,6 @@ class RouteModelSimmons:
                     forbidden_arcs.add(partial[-1])
                     del partial[-1]
                     continue
-                #print("[E] no cycle-free solution")
-                #likelihood *= float(weight) / sum(v for _, v in most_likely)
-                ##return partial[len(partial_route):], likelihood
-                #e = RouteException("no solution w/o cycle found, aborting route!")
-                #e.route = partial[len(partial_route):]
-                #raise e
 
         return partial[len(partial_route):], likelihood
 

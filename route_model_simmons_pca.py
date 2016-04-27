@@ -18,13 +18,15 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
     ARRIVAL = None
 
     PCA_WEIGHTS = False
-    CLUSTER_DESTINATIONS = False
     REJECT_NOISE_DESTINATIONS = False
 
-    def __init__(self, decompositor = PCA(n_components = 3)):
+    def __init__(self, decompositor = PCA(n_components = 3),
+            cluster_destinations = False):
         self._decompositor = decompositor
         self._pca_route_parts = 1
+        self._cluster_destinations = cluster_destinations
         RouteModelSimmons.__init__(self)
+        self._accept_wrong_arrival = not self._cluster_destinations
 
     def _route_to_array(self, route, features, default = 0.0):
         s = set(route)
@@ -87,7 +89,7 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
 
         # Cluster destinations
 
-        if self.CLUSTER_DESTINATIONS:
+        if self._cluster_destinations:
             a_destinations = np.zeros((len(routes), 2))
             for i, routefeatures in enumerate(routes):
                 route, features = self._split_route(routefeatures)
@@ -142,20 +144,13 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
 
                     X[i * parts + part, :] = rta(route2, features)
 
-        #print("_X=", self._X)
-        #print(np.where(X != 0))
-        #print("_X.shape=", self._X.shape)
-
-        #plots.matrix(X, '/tmp/X.png')
-        #sys.exit(1)
-
         self._decompositor.fit(self._X)
 
         if hasattr(self._decompositor, 'explained_variance_ratio_'):
             print("variances={}".format(self._decompositor.explained_variance_ratio_))
 
         print("learning routes...")
-        if self.CLUSTER_DESTINATIONS:
+        if self._cluster_destinations:
             for routefeatures, g in zip(routes, dbscan.labels_):
                 route, features = self._split_route(routefeatures)
                 self._learn_route(route, g, features)

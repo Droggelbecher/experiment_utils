@@ -360,9 +360,23 @@ def test_partial_prediction(d):
     for partial_length in (0.0, 0.1, 0.2, 0.3):
     #for partial_length in (0.1,):
         route_models = [
-                C(name = 'SimmonsNoF',  make = RouteModelSimmonsNoFeatures,     stats = util.listdict()),
-                #C(name = 'Simmons',     make = RouteModelSimmons,               stats = util.listdict()),
-                C(name = 'SimmonsPCA1', make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1)), stats = util.listdict()),
+                C(name = 'SimmonsNoF',
+                    make = RouteModelSimmonsNoFeatures,
+                    stats = util.listdict()),
+
+                C(name = 'Simmons',
+                    make = RouteModelSimmons,
+                    stats = util.listdict()),
+
+                C(name = 'SimmonsPCA1',
+                    make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1)),
+                    stats = util.listdict()),
+
+                C(name = 'SimmonsPCA1aclust',
+                    make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1)),
+                    cluster_destinations = True,
+                    stats = util.listdict()),
+
                 #C(name = 'SimmonsPCA2', make = lambda: RouteModelSimmonsPCA(PCA(n_components = 2)), stats = util.listdict()),
                 #C(name = 'SimmonsPCA3', make = lambda: RouteModelSimmonsPCA(PCA(n_components = 3)), stats = util.listdict()),
 
