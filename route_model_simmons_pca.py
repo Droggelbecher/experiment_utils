@@ -32,7 +32,7 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
         for id_ in s:
             idx = self._road_id_to_index[id_]
             r[idx] = 1
-        return np.hstack((r, np.array(features)))
+        return np.hstack((np.array(features), r))
         #return np.hstack((np.zeros(len(self._road_id_to_index)), np.array(features)))
 
     def _index(self, partial, features):
@@ -45,12 +45,17 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
 
         else:
 
-            a = self._route_to_array(partial, default = 0.5, features = features)
+            a = self._route_to_array(partial, default = 0.0, features = features)
             if len(partial):
                 p = partial[-1]
             else:
                 p = -1
-            r = (p,) + tuple(self._quantize_pc(x) for x in self._decompositor.transform(a.reshape(1, -1))[0,:])
+            
+            #print("a=", a)
+            transformed = self._decompositor.transform(a.reshape(1, -1))[0, :]
+            #print("transformed=", transformed)
+
+            r = (p,) + tuple(self._quantize_pc(x) for x in transformed)
             return r
 
     def _project(self, partial, features):

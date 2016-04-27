@@ -43,6 +43,7 @@ np.set_printoptions(threshold=9999999999,linewidth=99999,precision=3)
 GPS_TTP_FILENAME = '/tmp/gps.ttp'
 MAX_COMPONENTS = 3
 HAVE_NAVKIT = False
+RENDER_COMPONENTS = False
 
 
 @cached(filename_kws = ['curfer_filename'], compute_if=ALWAYS if HAVE_NAVKIT else NEVER)
@@ -303,7 +304,7 @@ def test_partial_prediction(d):
     road_ids_to_endpoints = d['road_ids_to_endpoints']
 
 
-    def plot_gmaps(partial, continuation, name, **kws):
+    def plot_gmaps(partial, continuation, name, info):
         """
         Plot on a gmap a partial route and its continuation.
         """
@@ -311,7 +312,7 @@ def test_partial_prediction(d):
             [road_ids_to_endpoints[x[0]] for x in partial],
             [road_ids_to_endpoints[x[0]] for x in continuation],
             ])
-        info = ['{}: {}'.format(k, v) for k, v in kws.items()]
+        #info = ['{}: {}'.format(k, v) for k, v in kws.items()]
         g = gmaps.generate_gmaps(center = road_ids_to_endpoints.values()[0][0], lines = lines,
                 info = info)
         f = open('/tmp/gmaps_{}.html'.format(name), 'w')
@@ -344,7 +345,7 @@ def test_partial_prediction(d):
         print("total routes:", len(routes))
 
         ziproutes = zip(routes, features)
-        random.shuffle(ziproutes)
+        random.shuffle(ziproutes, lambda: 0.42)
 
 
         # Cross-validate prediction accuracy
@@ -355,7 +356,8 @@ def test_partial_prediction(d):
 
         results = {}
 
-    for partial_length in (0.0, 0.25, 0.5, 0.75):
+    #for partial_length in (0.0, 0.25, 0.5, 0.75):
+    for partial_length in (0.0, 0.1, 0.2, 0.3): # 0.25, 0.5, 0.75):
         route_models = [
                 C(name = 'SimmonsNoF',  make = RouteModelSimmonsNoFeatures,     stats = util.listdict()),
                 #C(name = 'Simmons',     make = RouteModelSimmons,               stats = util.listdict()),
@@ -363,7 +365,10 @@ def test_partial_prediction(d):
                 #C(name = 'SimmonsPCA2', make = lambda: RouteModelSimmonsPCA(2), stats = util.listdict()),
                 #C(name = 'SimmonsPCA3', make = lambda: RouteModelSimmonsPCA(PCA(n_components = 3)), stats = util.listdict()),
                 #C(name = 'SimmonsPCA10', make = lambda: RouteModelSimmonsPCA(PCA(10)), stats = util.listdict()),
-                C(name = 'SimmonsAutoEnc10', make = lambda: RouteModelSimmonsPCA(DenoisingAutoencoder(10)), stats = util.listdict()),
+
+                # Is great (that is, slightly better than PCA, exactly as good
+                # as NoF [ :( ], costs a long time to compute (~5-7min per CV)
+                #C(name = 'SimmonsAutoEnc10', make = lambda: RouteModelSimmonsPCA(DenoisingAutoencoder(10)), stats = util.listdict()),
                 ]
         results[partial_length] = route_models
 
@@ -380,6 +385,30 @@ def test_partial_prediction(d):
                     routes = list(itertools.chain(*(chunks[:cv_idx] + chunks[cv_idx + 1:])))
                     model.learn_routes(routes, road_ids_to_endpoints)
 
+                    # If model has components, render them
+
+                    if RENDER_COMPONENTS and hasattr(model, '_decompositor'):
+                        if hasattr(model._decompositor, 'components_'):
+                            sorted_road_ids = np.array(sorted(road_ids_to_endpoints.keys()))
+                            endpoints = np.array([road_ids_to_endpoints[id_] for id_ in sorted_road_ids])
+
+                            components = model._decompositor.components_.T
+                            for i in range(components.shape[1]):
+                                component = components[:,i]
+                                route = component[7 + 24:]
+                                info = [
+                                        'Route min: {} max: {}'.format(min(route), max(route)),
+                                        gmaps.generate_html_bar_graph(component[:7], range(7)),
+                                        gmaps.generate_html_bar_graph(component[7:7+24], range(24)),
+                                        ]
+                                lines = gmaps.weighted_lines(route, endpoints)
+                                g = gmaps.generate_gmaps(center =
+                                        endpoints[0][0], lines =
+                                        lines, info = info)
+                                f = open('/tmp/{}_{}_{}_comp_{}.html'.format(d.name, partial_length, cv_idx, i), 'w')
+                                f.write(g)
+                                f.close()
+
                     # evaluate on cv_idx
 
                     for i, (route, features) in enumerate(chunks[cv_idx]):
@@ -391,10 +420,15 @@ def test_partial_prediction(d):
                         # score the test route can achieve (that is max similarity
                         # to any known route):
                         s_max = 0
+                        route_max = None
+                        f_max = None
                         for (route2, f2) in routes:
                             s = eval_metric(expected, route2[l:])
                             if s > s_max:
                                 s_max = s
+                                route_max = route2
+                                f_max = f2
+                                
                                 # Ok, we got it, we should be able to predict this
                                 # one pretty well
                                 if s_max >= .99:
@@ -405,7 +439,7 @@ def test_partial_prediction(d):
 
                         d.stats['test_route_score'].append(s_max)
 
-
+                        print("l=", l, "best=", route_max)
 
                         partial = route[:l]
                         predicted = test_predict_route(model, partial, expected, features, d.stats)
@@ -419,10 +453,23 @@ def test_partial_prediction(d):
                             len(expected),
                             len(predicted)))
 
-                        plot_gmaps(partial, expected, '{}_{}_{}_expected'.format(d.name, cv_idx, i))
-                        plot_gmaps(partial, predicted, '{}_{}_{}_predicted'.format(d.name, cv_idx, i),
-                                likelihood = d.stats['likelihood'][-1],
-                                score = d.stats['score'][-1])
+                        plot_gmaps(partial, expected, '{}_{}_{}_{}_expected'.format(d.name, partial_length, cv_idx, i),
+                                info = [
+                                    gmaps.generate_html_bar_graph(features[:7], 'Mo Tu We Th Fr Sa Su'.split()),
+                                    gmaps.generate_html_bar_graph(features[7:7+24], range(24)),
+                                    ])
+
+                        plot_gmaps(partial, route_max, '{}_{}_{}_{}_best'.format(d.name, partial_length, cv_idx, i),
+                                info = [
+                                    gmaps.generate_html_bar_graph(f_max[:7], 'Mo Tu We Th Fr Sa Su'.split()),
+                                    gmaps.generate_html_bar_graph(f_max[7:7+24], range(24)),
+                                    ])
+
+                        plot_gmaps(partial, predicted, '{}_{}_{}_{}_predicted'.format(d.name, partial_length, cv_idx, i),
+                                info = [
+                                    '{}: {}'.format(k, v[-1]) for k,v in d.stats.items()
+                                    #'{}: {}'.format((k, v[-1] if len(v) else '-') for k, v in d.stats.items())
+                                    ])
 
     with Timer("plotting"):
         
