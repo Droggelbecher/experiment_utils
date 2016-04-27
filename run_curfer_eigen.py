@@ -273,8 +273,8 @@ def eval_metric(predicted, expected):
     return jaccard(predicted[:-IGNORE_LAST_ARCS], expected[:-IGNORE_LAST_ARCS])
 
 def test_predict_route(model, partial, expected, features, stats):
-    stats['length_partial'].append(len(partial))
-    stats['length_expected'].append(len(expected))
+
+    exc = 0
 
     try:
         predicted, likelihood = model.predict_route(partial, features)
@@ -282,18 +282,22 @@ def test_predict_route(model, partial, expected, features, stats):
     except RouteException as e:
         predicted = e.route
         likelihood = 0
-        stats['exception'].append(1)
+        exc = 1
 
-    else:
-        stats['exception'].append(0)
+    if likelihood >= 0.1:
 
-    score = eval_metric(predicted, expected)
+        score = eval_metric(predicted, expected)
 
-    stats['likelihood'].append(likelihood)
-    stats['score'].append(score)
-    stats['length_predicted'].append(len(predicted))
+        stats['exception'].append(exc)
+        stats['length_partial'].append(len(partial))
+        stats['length_expected'].append(len(expected))
+        stats['likelihood'].append(likelihood)
+        stats['score'].append(score)
+        stats['length_predicted'].append(len(predicted))
 
-    return predicted
+        return predicted
+
+    return None
 
 
 
@@ -349,7 +353,7 @@ def test_partial_prediction(d):
 
         results = {}
 
-    for partial_length in (0.5, 0.7, 0.9):
+    for partial_length in (0.25, 0.5, 0.75):
         route_models = [
                 C(name = 'SimmonsNoF',
                     make = RouteModelSimmonsNoFeatures,
@@ -368,10 +372,10 @@ def test_partial_prediction(d):
                     #cluster_arrivals = True,
                     #stats = util.listdict()),
 
-                C(name = 'SimmonsPCA1dclust',
-                    make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1)),
-                    cluster_departures = True,
-                    stats = util.listdict()),
+                #C(name = 'SimmonsPCA1dclust',
+                    #make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1)),
+                    #cluster_departures = True,
+                    #stats = util.listdict()),
 
                 #C(name = 'SimmonsPCA2', make = lambda: RouteModelSimmonsPCA(PCA(n_components = 2)), stats = util.listdict()),
                 #C(name = 'SimmonsPCA3', make = lambda: RouteModelSimmonsPCA(PCA(n_components = 3)), stats = util.listdict()),
@@ -456,10 +460,18 @@ def test_partial_prediction(d):
                         #if s_max < 0.8:
                             #continue
 
-                        d.stats['test_route_score'].append(s_max)
-
                         partial = route[:l]
+
+                        #
+                        #
                         predicted = test_predict_route(model, partial, expected, cv_features, d.stats)
+                        #
+                        #
+
+                        if predicted is None:
+                            continue
+
+                        d.stats['test_route_score'].append(s_max)
 
                         print("{} cv {} i {} likelihood {} score {} partial/rel {} partial/abs {} explen {} predlen {}".format(
                             d.name, cv_idx, i,
@@ -495,12 +507,16 @@ def test_partial_prediction(d):
             for d in route_models:
                 scores = d.stats['score']
 
+                if not len(scores):
+                    continue
+
                 print("total partial length {:5.4f} {:20s} score/jaccard min {:5.4f} avg {:5.4f} max {:5.4f}".format(
                     partial_length,
                     d.name,
                     min(scores), sum(scores)/len(scores), max(scores)))
 
                 plots.relation(d.stats['test_route_score'], d.stats['score'], '/tmp/{}_{}_rel_score.pdf'.format(d.name, partial_length))
+                plots.relation(d.stats['likelihood'], d.stats['score'], '/tmp/{}_{}_likely_score.pdf'.format(d.name, partial_length))
         
 
         ls = sorted(results.keys())

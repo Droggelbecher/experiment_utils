@@ -58,7 +58,7 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
             return r
 
     def _project(self, partial, features):
-        a = self._route_to_array(partial, default = 0.5)
+        a = np.hstack((features, self._route_to_array(partial, default = 0.0)))
         return self._decompositor.transform(a.reshape(1, -1))
 
     def _quantize_pc(self, v):
@@ -160,6 +160,8 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
                     X[i * parts + part, features.shape[1]:] = rta(route2)
 
         X[:,:features.shape[1]] = features
+        
+        self._average = np.average(X, axis=0)
 
         self._decompositor.fit(self._X)
 
@@ -203,6 +205,16 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
 
         # The "... + Counter()" is for normalization (remove 0-counts etc...)
         return r + Counter()
+
+    def predict_route(self, partial_route, features):
+        route, likeli = RouteModelSimmons.predict_route(self, partial_route, features)
+
+        return (
+                route,
+                np.hstack((features, self._route_to_array(partial_route, default = 0.0))).dot(self._average) / len(partial_route)
+                #np.hstack((features, self._route_to_array(partial_route, default = 0.0))).dot(self._average) / len(route)
+                #self._project(partial_route, features)[0]
+                )
 
 
 
