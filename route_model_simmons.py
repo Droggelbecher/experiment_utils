@@ -86,16 +86,24 @@ class RouteModelSimmons:
         likelihood = 1.0
         arrivals = self.predict_arrival(partial_route, features)
 
+        #print("-- predict_route")
+        #print("index=", self._index(partial_route, features))
+        #print("partial=", partial_route)
+        #print("likely arrivals=", arrivals)
+
         if len(arrivals) > 0:
             max_arrival = arrivals.most_common()[0][0]
         else:
             max_arrival = None
+
+        #print("max_arrival=", max_arrival)
 
         forbidden_arcs = set()
 
         #print("max_arrival", max_arrival)
 
         while True:
+            #print(partial[len(partial_route):])
             # MLE estimate, marginalize over goals
             most_likely = self.predict_arc(partial, features, fix_g = max_arrival).most_common()
             likely_allowed = [(k, v) for (k, v) in most_likely if k not in forbidden_arcs]
@@ -106,7 +114,7 @@ class RouteModelSimmons:
 
             if len(likely_allowed) < 1:
                 if not self.BACKTRACK or len(partial) <= len(partial_route):
-                    print("stuck with no alternative")
+                    #print("stuck with no alternative")
                     #return partial[len(partial_route):], likelihood
                     e = RouteException("stuck with no alternatives!")
                     e.route = partial[len(partial_route):]
@@ -119,16 +127,23 @@ class RouteModelSimmons:
 
             for i, (route_id, weight) in enumerate(likely_allowed):
                 if route_id is self.ARRIVAL:
-                    likelihood *= float(weight) / sum(v for _, v in most_likely)
-                    return partial[len(partial_route):], likelihood
+                    if max_arrival is None or route_id == max_arrival:
+                        #print("max arrival found")
+                        likelihood *= float(weight) / sum(v for _, v in most_likely)
+                        return partial[len(partial_route):], likelihood
+                    else:
+                        #print("wrong arrival found")
+                        continue
 
                 elif route_id not in partial:
+                    #print("normal arc")
                     likelihood *= float(weight) / sum(v for _, v in most_likely)
                     partial.append(route_id)
                     break
             else:
+                print("no cycle-free solution")
                 likelihood *= float(weight) / sum(v for _, v in most_likely)
-                return partial[len(partial_route):], likelihood
+                #return partial[len(partial_route):], likelihood
                 e = RouteException("no solution w/o cycle found, aborting route!")
                 e.route = partial[len(partial_route):]
                 raise e
