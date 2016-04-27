@@ -284,20 +284,18 @@ def test_predict_route(model, partial, expected, features, stats):
         likelihood = 0
         exc = 1
 
-    if likelihood >= 0.1:
+    score = eval_metric(predicted, expected)
 
-        score = eval_metric(predicted, expected)
+    stats['exception'].append(exc)
+    stats['length_partial'].append(len(partial))
+    stats['length_expected'].append(len(expected))
+    stats['likelihood'].append(likelihood)
+    stats['score'].append(score)
+    stats['length_predicted'].append(len(predicted))
 
-        stats['exception'].append(exc)
-        stats['length_partial'].append(len(partial))
-        stats['length_expected'].append(len(expected))
-        stats['likelihood'].append(likelihood)
-        stats['score'].append(score)
-        stats['length_predicted'].append(len(predicted))
+    stats['announced'].append(likelihood >= 0.1)
 
-        return predicted
-
-    return None
+    return predicted
 
 
 
@@ -367,11 +365,11 @@ def test_partial_prediction(d):
                     make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1)),
                     stats = util.listdict()),
 
-                C(name = 'SimmonsPCA1clust',
-                    make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1)),
-                    cluster_arrivals = True,
-                    cluster_departures = True,
-                    stats = util.listdict()),
+                #C(name = 'SimmonsPCA1clust',
+                    #make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1)),
+                    #cluster_arrivals = True,
+                    #cluster_departures = True,
+                    #stats = util.listdict()),
 
                 C(name = 'SimmonsPCA3',
                     make = lambda: RouteModelSimmonsPCA(PCA(n_components = 3)),
@@ -465,9 +463,6 @@ def test_partial_prediction(d):
                         #
                         #
 
-                        if predicted is None:
-                            continue
-
                         d.stats['test_route_score'].append(s_max)
 
                         print("{} cv {} i {} likelihood {} score {} partial/rel {} partial/abs {} explen {} predlen {}".format(
@@ -514,9 +509,24 @@ def test_partial_prediction(d):
 
                 plots.relation(d.stats['test_route_score'], d.stats['score'], '/tmp/{}_{}_rel_score.pdf'.format(d.name, partial_length))
                 plots.relation(d.stats['likelihood'], d.stats['score'], '/tmp/{}_{}_likely_score.pdf'.format(d.name, partial_length))
+
+
+                plots.cdfs([
+                    { 'label': 'announced', 'values': [s for s, p in zip(d.stats['score'], d.stats['announced']) if p] },
+                    { 'label': 'unannounced', 'values': [s for s, p in zip(d.stats['score'], d.stats['announced']) if not p] },
+                    ], filename='/tmp/{}_{}_announced_scores.pdf'.format(d.name,
+                        partial_length))
         
 
         ls = sorted(results.keys())
+
+        plots.multi_boxplots(
+                xs = ls,
+                ysss = [ [[s for s, a in zip(results[l][i].stats['score'], results[l][i].stats['announced']) if a] for l in ls] for i in range(len(route_models)) ],
+                labels = [rm.name for rm in route_models],
+                ylim = (-.05, 1.05),
+                filename = '/tmp/scores_by_length_announced.pdf'
+                )
 
         plots.multi_boxplots(
                 xs = ls,

@@ -66,13 +66,17 @@ def relation(xs, ys, filename):
 
 def cdfs(a, filename):
     """
-    a: [ [ ... ], [ ... ], ... ]
+    a: [ { 'label': 'foo', 'values': [ ... ] }, ... ]
     """
 
     plt.clf()
     plt.cla()
     for i, (d, c) in enumerate(zip(a, plt.cm.Paired(np.linspace(0, 1, len(a))))):
         values = d['values']
+
+        if len(values) == 0:
+            values = [0]
+
         values = np.sort(values)
         avg = np.sum(values)/len(values)
         median = np.median(values)
