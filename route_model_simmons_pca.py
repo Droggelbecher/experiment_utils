@@ -209,12 +209,11 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
     def predict_route(self, partial_route, features):
         route, likeli = RouteModelSimmons.predict_route(self, partial_route, features)
 
-        return (
-                route,
-                np.hstack((features, self._route_to_array(partial_route, default = 0.0))).dot(self._average) / len(partial_route)
-                #np.hstack((features, self._route_to_array(partial_route, default = 0.0))).dot(self._average) / len(route)
-                #self._project(partial_route, features)[0]
-                )
+        queryvector = np.hstack((features, self._route_to_array(route, default = 0.0)))
+        dot = queryvector.dot(self._average)
+        norm = (np.linalg.norm(queryvector) * np.linalg.norm(self._average))
+
+        return (route, dot / norm)
 
 
 

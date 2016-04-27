@@ -353,7 +353,7 @@ def test_partial_prediction(d):
 
         results = {}
 
-    for partial_length in (0.25, 0.5, 0.75):
+    for partial_length in (0.0, 0.25, 0.5, 0.75):
         route_models = [
                 C(name = 'SimmonsNoF',
                     make = RouteModelSimmonsNoFeatures,
@@ -367,18 +367,15 @@ def test_partial_prediction(d):
                     make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1)),
                     stats = util.listdict()),
 
-                #C(name = 'SimmonsPCA1aclust',
-                    #make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1)),
-                    #cluster_arrivals = True,
-                    #stats = util.listdict()),
+                C(name = 'SimmonsPCA1clust',
+                    make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1)),
+                    cluster_arrivals = True,
+                    cluster_departures = True,
+                    stats = util.listdict()),
 
-                #C(name = 'SimmonsPCA1dclust',
-                    #make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1)),
-                    #cluster_departures = True,
-                    #stats = util.listdict()),
-
-                #C(name = 'SimmonsPCA2', make = lambda: RouteModelSimmonsPCA(PCA(n_components = 2)), stats = util.listdict()),
-                #C(name = 'SimmonsPCA3', make = lambda: RouteModelSimmonsPCA(PCA(n_components = 3)), stats = util.listdict()),
+                C(name = 'SimmonsPCA3',
+                    make = lambda: RouteModelSimmonsPCA(PCA(n_components = 3)),
+                    stats = util.listdict()),
 
                 # Is great (that is, slightly better than PCA, exactly as good
                 # as NoF [ :( ], costs a long time to compute (~5-7min per CV)

@@ -36,8 +36,11 @@ def all_relations(a, filename, labels = None):
                 else:
                     axs[row - 1, column].set_xlabel(labels[column])
 
-                axs[row - 1, column].set_xlim((np.min(a[:,column]), np.max(a[:,column])))
-                axs[row - 1, column].set_ylim((np.min(a[:,row]), np.max(a[:,row])))
+                if len(a[:,column]):
+                    axs[row - 1, column].set_xlim((np.min(a[:,column]), np.max(a[:,column])))
+
+                if len(a[:,row]):
+                    axs[row - 1, column].set_ylim((np.min(a[:,row]), np.max(a[:,row])))
             else:
                 axs[row - 1, column].axis('off')
 
