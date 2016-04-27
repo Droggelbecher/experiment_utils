@@ -32,21 +32,17 @@ class RouteModelSimmons:
 
         self._accept_wrong_arrival = True
 
-    def _split_route(self, route):
-        return route[0], route[1]
-
     def _index(self, partial, features):
         if len(partial):
             return (partial[-1],) + tuple(features)
         else:
             return (-1,) + tuple(features)
 
-    def learn_routes(self, routes, _):
-        for r in routes:
-            route, features = self._split_route(r)
+    def learn_routes(self, routes, features, _):
+        for i, route in enumerate(routes):
             if not len(route):
                 continue
-            self._learn_route(route, route[-1], features)
+            self._learn_route(route, route[-1], features[i,:])
 
     def _learn_route(self, route, g, features):
         """

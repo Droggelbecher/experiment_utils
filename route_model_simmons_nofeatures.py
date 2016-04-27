@@ -1,16 +1,13 @@
 
 
-from route_model_simmons import RouteModelSimmons
+import numpy as np
 
+from route_model_simmons import RouteModelSimmons
 
 class RouteModelSimmonsNoFeatures(RouteModelSimmons):
 
-    def learn_routes(self, routes, _):
-        for r in routes:
-            route, features = self._split_route(r)
-            if not len(route):
-                continue
-            self._learn_route(route, route[-1], ())
+    def learn_routes(self, routes, features, _):
+        return RouteModelSimmons.learn_routes(self, routes, np.zeros((len(routes), 0)), _)
 
     def predict_route(self, partial_route, features):
         return RouteModelSimmons.predict_route(self, partial_route, ())

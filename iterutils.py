@@ -15,3 +15,14 @@ def chunks(list_, n):
     for i in range(0, len(list_), sz):
         yield list_[i:i + sz]
 
+class CV:
+    def __init__(self, n, parts):
+        self.n = n
+        self.parts = parts
+        self._sz = int(math.ceil(n / float(parts)))
+
+    def __iter__(self):
+
+        for i in range(0, self.n, self._sz):
+            yield i, i + self._sz
+

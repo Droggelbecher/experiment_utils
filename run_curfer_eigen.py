@@ -330,51 +330,47 @@ def test_partial_prediction(d):
                 for route, coordinate_route, departure_time in
                 zip(d['routes'], d['coordinate_routes'], d['departure_times'])
                 ]
-
-        # Compute feature vectors (weekday & time of day)
-
-        features = [] 
-        for i, departure_time in enumerate(d['departure_times']):
-            f = np.zeros(7 + 24)
-            if departure_time is not None:
-                dt = datetime.utcfromtimestamp(departure_time)
-                f[dt.weekday()] = 1.0
-                f[7 + dt.hour] = 1.0
-            features.append(f)
-
+        random.shuffle(routes, lambda: 0.42)
         print("total routes:", len(routes))
 
-        ziproutes = zip(routes, features)
-        random.shuffle(ziproutes, lambda: 0.42)
 
+        # Compute feature vectors (weekday & time of day)
+        #
+        features = np.zeros((len(routes), 7 + 24))
+        for i, departure_time in enumerate(d['departure_times']):
+            if departure_time is not None:
+                dt = datetime.utcfromtimestamp(departure_time)
+                features[i, dt.weekday()] = 1.0
+                features[i, 7 + dt.hour] = 1.0
 
         # Cross-validate prediction accuracy
         #
         CV_FACTOR = 10
-        chunks = list(iterutils.chunks(ziproutes, CV_FACTOR))
-
 
         results = {}
 
-    #for partial_length in (0.0, 0.25, 0.5, 0.75):
-    for partial_length in (0.0, 0.1, 0.2, 0.3):
-    #for partial_length in (0.1,):
+    for partial_length in (0.5, 0.7, 0.9):
         route_models = [
                 C(name = 'SimmonsNoF',
                     make = RouteModelSimmonsNoFeatures,
                     stats = util.listdict()),
 
-                C(name = 'Simmons',
-                    make = RouteModelSimmons,
-                    stats = util.listdict()),
+                #C(name = 'Simmons',
+                    #make = RouteModelSimmons,
+                    #stats = util.listdict()),
 
                 C(name = 'SimmonsPCA1',
                     make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1)),
                     stats = util.listdict()),
 
-                C(name = 'SimmonsPCA1aclust',
+                #C(name = 'SimmonsPCA1aclust',
+                    #make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1)),
+                    #cluster_arrivals = True,
+                    #stats = util.listdict()),
+
+                C(name = 'SimmonsPCA1dclust',
                     make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1)),
-                    cluster_arrivals = True,
+                    cluster_departures = True,
                     stats = util.listdict()),
 
                 #C(name = 'SimmonsPCA2', make = lambda: RouteModelSimmonsPCA(PCA(n_components = 2)), stats = util.listdict()),
@@ -386,18 +382,21 @@ def test_partial_prediction(d):
                 ]
         results[partial_length] = route_models
 
-        for cv_idx in range(CV_FACTOR):
-            print("cv_idx={} routes={}".format(cv_idx, len(chunks[cv_idx])))
+        for cv_idx, (cv_start, cv_end) in enumerate(iterutils.CV(len(routes), CV_FACTOR)):
 
             for d in route_models:
 
                 with Timer('{} {}/{}'.format(d.name, cv_idx, CV_FACTOR)):
 
-                    # train on all chunks but cv_idx
+                    #
+                    # train on all chunks except the CV range
+                    # 
                     
                     model = d.make()
-                    routes = list(itertools.chain(*(chunks[:cv_idx] + chunks[cv_idx + 1:])))
-                    model.learn_routes(routes, road_ids_to_endpoints)
+                    learn_routes = routes[:cv_start] + routes[cv_end:]
+
+                    learn_features = np.vstack((features[:cv_start,:], features[cv_end:,:]))
+                    model.learn_routes(learn_routes, learn_features, road_ids_to_endpoints)
 
                     # If model has components, render them
 
@@ -423,9 +422,11 @@ def test_partial_prediction(d):
                                 f.write(g)
                                 f.close()
 
+                    #
                     # evaluate on cv_idx
+                    #
 
-                    for i, (route, features) in enumerate(chunks[cv_idx]):
+                    for i, (route, cv_features) in enumerate(zip(routes[cv_start:cv_end], features[cv_start:cv_end,:])):
 
                         l = max(1, int(partial_length * len(route)))
                         expected = route[l:]
@@ -436,7 +437,7 @@ def test_partial_prediction(d):
                         s_max = 0
                         route_max = None
                         f_max = None
-                        for (route2, f2) in routes:
+                        for (route2, f2) in zip(learn_routes, learn_features):
                             s = eval_metric(expected, route2[l:])
                             if s > s_max:
                                 s_max = s
@@ -448,13 +449,17 @@ def test_partial_prediction(d):
                                 if s_max >= .99:
                                     break
 
-                        if s_max < 0.8:
-                            continue
+                        #
+                        # (For now), only measure on repeated routes
+                        # (that is, those that have at least 80% overlap with
+                        # at least one learned route)
+                        #if s_max < 0.8:
+                            #continue
 
                         d.stats['test_route_score'].append(s_max)
 
                         partial = route[:l]
-                        predicted = test_predict_route(model, partial, expected, features, d.stats)
+                        predicted = test_predict_route(model, partial, expected, cv_features, d.stats)
 
                         print("{} cv {} i {} likelihood {} score {} partial/rel {} partial/abs {} explen {} predlen {}".format(
                             d.name, cv_idx, i,
@@ -467,15 +472,16 @@ def test_partial_prediction(d):
 
                         plot_gmaps(partial, expected, '{}_{}_{}_{}_expected'.format(d.name, partial_length, cv_idx, i),
                                 info = [
-                                    gmaps.generate_html_bar_graph(features[:7], 'Mo Tu We Th Fr Sa Su'.split()),
-                                    gmaps.generate_html_bar_graph(features[7:7+24], range(24)),
+                                    gmaps.generate_html_bar_graph(cv_features[:7], 'Mo Tu We Th Fr Sa Su'.split()),
+                                    gmaps.generate_html_bar_graph(cv_features[7:7+24], range(24)),
                                     ])
 
-                        plot_gmaps(partial, route_max, '{}_{}_{}_{}_best'.format(d.name, partial_length, cv_idx, i),
-                                info = [
-                                    gmaps.generate_html_bar_graph(f_max[:7], 'Mo Tu We Th Fr Sa Su'.split()),
-                                    gmaps.generate_html_bar_graph(f_max[7:7+24], range(24)),
-                                    ])
+                        if route_max is not None:
+                            plot_gmaps(partial, route_max, '{}_{}_{}_{}_best'.format(d.name, partial_length, cv_idx, i),
+                                    info = [
+                                        gmaps.generate_html_bar_graph(f_max[:7], 'Mo Tu We Th Fr Sa Su'.split()),
+                                        gmaps.generate_html_bar_graph(f_max[7:7+24], range(24)),
+                                        ])
 
                         plot_gmaps(partial, predicted, '{}_{}_{}_{}_predicted'.format(d.name, partial_length, cv_idx, i),
                                 info = [
