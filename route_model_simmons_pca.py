@@ -18,15 +18,15 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
     ARRIVAL = None
 
     PCA_WEIGHTS = False
-    REJECT_NOISE_DESTINATIONS = False
+    REJECT_NOISE_ARRIVALS = False
 
     def __init__(self, decompositor = PCA(n_components = 3),
-            cluster_destinations = False):
+            cluster_arrivals = False):
         self._decompositor = decompositor
         self._pca_route_parts = 1
-        self._cluster_destinations = cluster_destinations
+        self._cluster_arrivals = cluster_arrivals
         RouteModelSimmons.__init__(self)
-        self._accept_wrong_arrival = not self._cluster_destinations
+        self._accept_wrong_arrival = not self._cluster_arrivals
 
     def _route_to_array(self, route, features, default = 0.0):
         s = set(route)
@@ -35,7 +35,6 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
             idx = self._road_id_to_index[id_]
             r[idx] = 1
         return np.hstack((np.array(features), r))
-        #return np.hstack((np.zeros(len(self._road_id_to_index)), np.array(features)))
 
     def _index(self, partial, features):
         """
@@ -46,17 +45,13 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
             return RouteModelSimmons._index(self, partial, features)
 
         else:
-
             a = self._route_to_array(partial, default = 0.0, features = features)
             if len(partial):
                 p = partial[-1]
             else:
                 p = -1
             
-            #print("a=", a)
             transformed = self._decompositor.transform(a.reshape(1, -1))[0, :]
-            #print("transformed=", transformed)
-
             r = (p,) + tuple(self._quantize_pc(x) for x in transformed)
             return r
 
@@ -65,7 +60,6 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
         return self._decompositor.transform(a.reshape(1, -1))
 
     def _quantize_pc(self, v):
-        #return round(v, 1)
         eps = .1
         if v < -eps:
             return -1.0
@@ -87,25 +81,25 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
         self._road_id_to_index = {(k, 0): i for i, k in s}
         self._road_id_to_index.update({(k, 1): i + l for i, k in s})
 
-        # Cluster destinations
+        # Cluster arrivals
 
-        if self._cluster_destinations:
-            a_destinations = np.zeros((len(routes), 2))
+        if self._cluster_:
+            a_arrivals = np.zeros((len(routes), 2))
             for i, routefeatures in enumerate(routes):
                 route, features = self._split_route(routefeatures)
                 if not len(route):
                     continue
-                a_destinations[i, :] = self._road_id_to_endpoint[route[-1]]
+                a_arrivals[i, :] = self._road_id_to_endpoint[route[-1]]
 
-            dbscan = DBSCAN(eps = 200, metric = geo.distance).fit(a_destinations)
+            dbscan = DBSCAN(eps = 200, metric = geo.distance).fit(a_arrivals)
 
-            print("destination labels", dbscan.labels_)
+            print("arrival labels", dbscan.labels_)
 
             g = gmaps.generate_gmaps(
-                    markers = a_destinations[dbscan.labels_ != -1, :],
-                    center = a_destinations[0, :],
+                    markers = a_arrivals[dbscan.labels_ != -1, :],
+                    center = a_arrivals[0, :],
                     )
-            f = open('/tmp/gmaps_destinations.html', 'w')
+            f = open('/tmp/gmaps_arrivals.html', 'w')
             f.write(g)
             f.close()
 
@@ -126,7 +120,6 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
 
         for i, routefeatures in enumerate(routes):
             route, features = self._split_route(routefeatures)
-            #print("len(route)=", len(route), " parts=", parts)
             if not len(route):
                 continue
 
@@ -136,11 +129,8 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
             else:
                 n = int(len(route)/parts)
                 for part in range(parts):
-                    #print('route=', len(route))
                     if part < parts - 1:
                         route2 = route[:(part+1) * n]
-
-                    #print('part=', part, 'n=', n, 'route=', len(route2))
 
                     X[i * parts + part, :] = rta(route2, features)
 
@@ -150,7 +140,7 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
             print("variances={}".format(self._decompositor.explained_variance_ratio_))
 
         print("learning routes...")
-        if self._cluster_destinations:
+        if self._cluster_arrivals:
             for routefeatures, g in zip(routes, dbscan.labels_):
                 route, features = self._split_route(routefeatures)
                 self._learn_route(route, g, features)
@@ -158,7 +148,7 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
             RouteModelSimmons.learn_routes(self, routes, road_ids_to_endpoints)
 
     def _learn_route(self, route, g, features):
-        if g == -1 and self.REJECT_NOISE_DESTINATIONS:
+        if g == -1 and self.REJECT_NOISE_ARRIVALS:
             print("route classified as noise")
             return
 
@@ -183,8 +173,6 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
                 w = pc_weights[self._road_id_to_index[l]]
 
             w = max(0, w)
-            #print('r[{}] = {:6.4f} * {:6.4f} * {:6.4f}'.format(l, arrivals[g], m, w))
-
             r[l] = arrivals[g] * m * w
 
         # The "... + Counter()" is for normalization (remove 0-counts etc...)

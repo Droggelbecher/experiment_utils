@@ -374,7 +374,7 @@ def test_partial_prediction(d):
 
                 C(name = 'SimmonsPCA1aclust',
                     make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1)),
-                    cluster_destinations = True,
+                    cluster_arrivals = True,
                     stats = util.listdict()),
 
                 #C(name = 'SimmonsPCA2', make = lambda: RouteModelSimmonsPCA(PCA(n_components = 2)), stats = util.listdict()),
