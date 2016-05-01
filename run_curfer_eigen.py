@@ -357,9 +357,9 @@ def test_partial_prediction(d):
                     make = RouteModelSimmonsNoFeatures,
                     stats = util.listdict()),
 
-                #C(name = 'Simmons',
-                    #make = RouteModelSimmons,
-                    #stats = util.listdict()),
+                C(name = 'Simmons',
+                    make = RouteModelSimmons,
+                    stats = util.listdict()),
 
                 C(name = 'SimmonsPCA1',
                     make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1)),

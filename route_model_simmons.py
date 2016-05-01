@@ -1,4 +1,5 @@
 
+import numpy as np
 
 from collections import defaultdict, Counter
 
@@ -38,7 +39,34 @@ class RouteModelSimmons:
         else:
             return (-1,) + tuple(features)
 
-    def learn_routes(self, routes, features, _):
+    def _route_to_array(self, route, default = 0.0):
+        s = set(route)
+        r = np.full(len(self._road_id_to_index), default)
+        for id_ in s:
+            idx = self._road_id_to_index[id_]
+            r[idx] = 1
+        return r
+
+    def learn_routes(self, routes, features, road_ids_to_endpoints):
+
+        # Map: road_id (+dir) -> index
+
+        s = list(enumerate(sorted(road_ids_to_endpoints.keys())))
+        l = len(s)
+        self._road_id_to_index = {(k, 0): i for i, k in s}
+        self._road_id_to_index.update({(k, 1): i + l for i, k in s})
+
+        # TODO: for this model its overkill to store X completely,
+        # we can compute the average continuously
+
+        X = np.zeros(shape = (len(routes), len(self._road_id_to_index) + features.shape[1]))
+        for i, route in enumerate(routes):
+            if not len(route):
+                continue
+            X[i,features.shape[1]:] = self._route_to_array(route)
+        X[:,:features.shape[1]] = features
+        self._average = np.average(X, axis=0)
+
         for i, route in enumerate(routes):
             if not len(route):
                 continue
@@ -79,7 +107,7 @@ class RouteModelSimmons:
 
         return r + Counter()
 
-    def predict_route(self, partial_route, features):
+    def _predict_route(self, partial_route, features):
         partial = partial_route[:]
         likelihood = 1.0
         arrivals = self.predict_arrival(partial_route, features)
@@ -129,4 +157,15 @@ class RouteModelSimmons:
                     continue
 
         return partial[len(partial_route):], likelihood
+
+    def predict_route(self, partial_route, features):
+        # TODO: Quick hack that throws away likelihood and substitutes it with
+        # average-projection
+        route, likeli = self._predict_route(partial_route, features)
+
+        queryvector = np.hstack((features, self._route_to_array(route, default = 0.0)))
+        dot = queryvector.dot(self._average)
+        norm = (np.linalg.norm(queryvector) * np.linalg.norm(self._average))
+
+        return (route, dot / norm)
 

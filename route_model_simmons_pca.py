@@ -206,14 +206,14 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
         # The "... + Counter()" is for normalization (remove 0-counts etc...)
         return r + Counter()
 
-    def predict_route(self, partial_route, features):
-        route, likeli = RouteModelSimmons.predict_route(self, partial_route, features)
+    #def predict_route(self, partial_route, features):
+        #route, likeli = RouteModelSimmons.predict_route(self, partial_route, features)
 
-        queryvector = np.hstack((features, self._route_to_array(route, default = 0.0)))
-        dot = queryvector.dot(self._average)
-        norm = (np.linalg.norm(queryvector) * np.linalg.norm(self._average))
+        #queryvector = np.hstack((features, self._route_to_array(route, default = 0.0)))
+        #dot = queryvector.dot(self._average)
+        #norm = (np.linalg.norm(queryvector) * np.linalg.norm(self._average))
 
-        return (route, dot / norm)
+        #return (route, dot / norm)
 
 
 
