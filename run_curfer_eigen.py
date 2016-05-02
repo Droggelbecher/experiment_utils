@@ -430,6 +430,8 @@ def test_partial_prediction(d):
 
                     for i, (route, cv_features) in enumerate(zip(routes[cv_start:cv_end], features[cv_start:cv_end,:])):
 
+                        d.stats['pointlabels'].append((cv_idx, i))
+
                         l = max(1, int(partial_length * len(route)))
                         expected = route[l:]
 
@@ -497,11 +499,14 @@ def test_partial_prediction(d):
                                     ])
 
     with Timer("plotting"):
+
+        #
+        # For each (model, partial_length) combination plot...
+        #
         
         for partial_length, route_models in results.items():
-            for d in route_models:
+            for model_idx, d in enumerate(route_models):
                 scores = d.stats['score']
-
                 if not len(scores):
                     continue
 
@@ -513,12 +518,20 @@ def test_partial_prediction(d):
                 plots.relation(d.stats['test_route_score'], d.stats['score'], '/tmp/{}_{}_rel_score.pdf'.format(d.name, partial_length))
                 plots.relation(d.stats['likelihood'], d.stats['score'], '/tmp/{}_{}_likely_score.pdf'.format(d.name, partial_length))
 
-
                 plots.cdfs([
                     { 'label': 'announced', 'values': [s for s, p in zip(d.stats['score'], d.stats['announced']) if p] },
                     { 'label': 'unannounced', 'values': [s for s, p in zip(d.stats['score'], d.stats['announced']) if not p] },
                     ], filename='/tmp/{}_{}_announced_scores.pdf'.format(d.name,
                         partial_length))
+
+                for d2 in route_models[model_idx:]:
+                    plots.relation(d.stats['score'],
+                            d2.stats['score'],
+                            filename = '/tmp/{}_{}_{}_score.pdf'.format(d.name, partial_length, d2.name),
+                            xlabel = d.name + ' score',
+                            ylabel = d2.name + ' score',
+                            pointlabels = ['{}.{}'.format(cv, i) for (cv, i) in d.stats['pointlabels']]
+                            )
         
 
         ls = sorted(results.keys())

@@ -6,6 +6,7 @@ import numpy as np
 #matplotlib.use('TkAgg')
 
 import matplotlib.pyplot as plt
+import matplotlib.transforms as mtrans
 
 def all_relations(a, filename, labels = None):
     """
@@ -50,19 +51,27 @@ def all_relations(a, filename, labels = None):
     f.set_size_inches((2*features, 2*features))
     f.savefig(filename, dpi=100)
 
-def relation(xs, ys, filename):
+def relation(xs, ys, filename, xlabel=None, ylabel=None, pointlabels = []):
     xsl = list(xs)
     ysl = list(ys)
-    a = np.array([xsl, ysl])
-    #cor = np.corrcoef(a, rowvar=True)
-    #cov = np.cov(a)
-    #print("cov=", cov)
-    #print("cor=", cor)
-    #plt.axes().arrow(0, 0, 1, cor[0, 1])
+
     plt.clf()
-    plt.scatter(xsl, ysl, c = plt.cm.Set1(np.linspace(0, 1, len(xsl))),
-            alpha=0.5)
-    plt.savefig(filename, dpi=100)
+    fig = plt.figure()
+    ax = plt.subplot(111)
+
+    trans_offset = mtrans.offset_copy(ax.transData, fig=fig, x = 0.05, y = 0.1, units='inches')
+
+    ax.scatter(xsl, ysl, c = plt.cm.Set1(np.linspace(0, 1, len(xsl))), alpha=0.5)
+    if xlabel:
+        ax.set_xlabel(xlabel)
+    if ylabel:
+        ax.set_ylabel(ylabel)
+
+    if pointlabels:
+        for x, y, l in zip(xsl, ysl, pointlabels):
+            ax.text(x, y, l, transform = trans_offset, fontsize=8)
+
+    fig.savefig(filename, dpi=100)
 
 def cdfs(a, filename):
     """
