@@ -188,7 +188,7 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
         """
         arrivals = self.predict_arrival(partial_route, features)
         if self.PCA_WEIGHTS:
-            pc_weights = self._decompositor.inverse_transform(self._project(partial_route, features))
+            pc_weights = self._decompositor.inverse_transform(self._project(partial_route, features))[0]
         r = Counter()
 
         for l, g, m in self._pls[ self._index(partial_route, features) ]:
