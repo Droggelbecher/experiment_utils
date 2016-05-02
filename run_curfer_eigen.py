@@ -18,7 +18,10 @@ import numpy as np
 import numpy.linalg as LA
 
 sys.path.append('sklearn_autoencoder')
-from autoencoder import DenoisingAutoencoder
+try:
+    from autoencoder import DenoisingAutoencoder
+except ImportError as e:
+    print "Warning: could not import autoencoder: " + str(e)
 
 from cache import cached, NEVER, ALWAYS
 from navkit import prepare_positioning, prepare_mapmatching, run_positioning, run_mapmatching
