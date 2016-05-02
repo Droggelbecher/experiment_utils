@@ -296,7 +296,7 @@ def test_predict_route(model, partial, expected, features, stats):
     stats['score'].append(score)
     stats['length_predicted'].append(len(predicted))
 
-    stats['announced'].append(likelihood >= 0.005)
+    stats['announced'].append(likelihood >= 0.04)
 
     return predicted
 

@@ -125,7 +125,7 @@ def multi_boxplots(xs, ysss, filename, ylim = None, labels = []):
     ysss = [ [ [ x x x x ], ... ], .... ]
     """
 
-    fig, axes = plt.subplots(1, 1)
+    fig, axes = plt.subplots(1, 1, figsize=(12, 7))
 
     k = len(ysss) + 1
     dummylines = []
@@ -135,7 +135,7 @@ def multi_boxplots(xs, ysss, filename, ylim = None, labels = []):
 
     for yss, c, offset in zip(
             ysss,
-            plt.cm.Paired(np.linspace(0, 1, len(ysss))),
+            plt.cm.Set1(np.linspace(0, 1, len(ysss))),
             range(1, 1 + len(ysss))):
         maxlen = max(maxlen, len(yss))
 

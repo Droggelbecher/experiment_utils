@@ -165,7 +165,8 @@ class RouteModelSimmons:
 
         queryvector = np.hstack((features, self._route_to_array(route, default = 0.0)))
         dot = queryvector.dot(self._average)
-        norm = (np.linalg.norm(queryvector) * np.linalg.norm(self._average)) * (len(route) + 1)
+        #norm = np.linalg.norm(queryvector) * np.linalg.norm(self._average)
+        norm = (len(route) + 1.0) * np.linalg.norm(self._average)
 
         return (route, dot / norm)
 
