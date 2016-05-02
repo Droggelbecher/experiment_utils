@@ -360,12 +360,40 @@ def test_partial_prediction(d):
                     make = RouteModelSimmonsNoFeatures,
                     stats = util.listdict()),
 
-                C(name = 'Simmons',
-                    make = RouteModelSimmons,
+                #C(name = 'Simmons',
+                    #make = RouteModelSimmons,
+                    #stats = util.listdict()),
+
+                C(name = 'SimmonsPCA1q.0',
+                    make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1), q = 0),
                     stats = util.listdict()),
 
-                C(name = 'SimmonsPCA1',
-                    make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1)),
+                C(name = 'SimmonsPCA1q.25',
+                    make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1), q = 0.25),
+                    stats = util.listdict()),
+
+                C(name = 'SimmonsPCA1q.5',
+                    make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1), q = 0.5),
+                    stats = util.listdict()),
+
+                #C(name = 'SimmonsPCA1q.75',
+                    #make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1), q = 0.75),
+                    #stats = util.listdict()),
+
+                C(name = 'SimmonsPCA1q1.0',
+                    make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1), q = 1.0),
+                    stats = util.listdict()),
+
+                C(name = 'SimmonsPCA1q2.0',
+                    make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1), q = 2.0),
+                    stats = util.listdict()),
+
+                C(name = 'SimmonsPCA1q4.0',
+                    make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1), q = 4.0),
+                    stats = util.listdict()),
+
+                C(name = 'SimmonsPCA1q8.0',
+                    make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1), q = 8.0),
                     stats = util.listdict()),
 
                 #C(name = 'SimmonsPCA1clust',
@@ -374,9 +402,9 @@ def test_partial_prediction(d):
                     #cluster_departures = True,
                     #stats = util.listdict()),
 
-                C(name = 'SimmonsPCA3',
-                    make = lambda: RouteModelSimmonsPCA(PCA(n_components = 3)),
-                    stats = util.listdict()),
+                #C(name = 'SimmonsPCA3',
+                    #make = lambda: RouteModelSimmonsPCA(PCA(n_components = 3)),
+                    #stats = util.listdict()),
 
                 # Is great (that is, slightly better than PCA, exactly as good
                 # as NoF [ :( ], costs a long time to compute (~5-7min per CV)
@@ -515,8 +543,17 @@ def test_partial_prediction(d):
                     d.name,
                     min(scores), sum(scores)/len(scores), max(scores)))
 
-                plots.relation(d.stats['test_route_score'], d.stats['score'], '/tmp/{}_{}_rel_score.pdf'.format(d.name, partial_length))
-                plots.relation(d.stats['likelihood'], d.stats['score'], '/tmp/{}_{}_likely_score.pdf'.format(d.name, partial_length))
+                plots.relation(d.stats['test_route_score'],
+                        d.stats['score'],
+                        '/tmp/{}_{}_rel_score.pdf'.format(d.name, partial_length),
+                        xlabel = 'max match route score',
+                        ylabel = 'predicted route score')
+
+                plots.relation(d.stats['likelihood'],
+                        d.stats['score'],
+                        '/tmp/{}_{}_likely_score.pdf'.format(d.name, partial_length),
+                        xlabel = 'confidence',
+                        ylabel = 'score')
 
                 plots.cdfs([
                     { 'label': 'announced', 'values': [s for s, p in zip(d.stats['score'], d.stats['announced']) if p] },

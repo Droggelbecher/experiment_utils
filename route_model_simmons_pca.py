@@ -10,6 +10,7 @@ from sklearn.cluster import DBSCAN
 import geo
 import gmaps
 import plots
+import util
 
 from route_model_simmons import RouteModelSimmons
 
@@ -22,7 +23,10 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
 
     def __init__(self, decompositor = PCA(n_components = 3),
             cluster_arrivals = False,
-            cluster_departures = False):
+            cluster_departures = False,
+            q = 0
+            ):
+        self._quantization = q
         self._decompositor = decompositor
         self._pca_route_parts = 1
         self._cluster_arrivals = cluster_arrivals
@@ -62,6 +66,8 @@ class RouteModelSimmonsPCA(RouteModelSimmons):
         return self._decompositor.transform(a.reshape(1, -1))
 
     def _quantize_pc(self, v):
+        return util.quantize(v, self._quantization)
+
         eps = .1
         if v < -eps:
             return -1.0

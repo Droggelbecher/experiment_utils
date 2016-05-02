@@ -50,6 +50,7 @@ def all_relations(a, filename, labels = None):
 
     f.set_size_inches((2*features, 2*features))
     f.savefig(filename, dpi=100)
+    plt.close(f)
 
 def relation(xs, ys, filename, xlabel=None, ylabel=None, pointlabels = []):
     xsl = list(xs)
@@ -72,6 +73,7 @@ def relation(xs, ys, filename, xlabel=None, ylabel=None, pointlabels = []):
             ax.text(x, y, l, transform = trans_offset, fontsize=8)
 
     fig.savefig(filename, dpi=100)
+    plt.close(fig)
 
 def cdfs(a, filename):
     """
@@ -162,6 +164,7 @@ def multi_boxplots(xs, ysss, filename, ylim = None, labels = []):
     if ylim is not None:
         axes.set_ylim(ylim)
     fig.savefig(filename, dpi=100)
+    plt.close(fig)
 
 
 def matrix(a, filename):
@@ -169,6 +172,7 @@ def matrix(a, filename):
     fig, ax = plt.subplots(figsize=(4, .5), dpi=100)
     ax.matshow(a, cmap=plt.cm.gray)
     fig.savefig(filename, dpi=1000)
+    plt.close(fig)
 
 
 if __name__ == '__main__':

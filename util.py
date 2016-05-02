@@ -14,4 +14,8 @@ class listdict(defaultdict):
         for k, v in other.items():
             self[k].extend(v)
 
+def quantize(v, q):
+    if q == 0:
+        return -1 if v < 0 else 1
 
+    return q * round(v / float(q))
