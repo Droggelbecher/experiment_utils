@@ -155,7 +155,7 @@ def multi_boxplots(xs, ysss, filename, ylim = None, labels = []):
         h, = plt.plot([1, 1], 'r-', c = c, color = c, linestyle='-')
         dummylines.append(h)
 
-    plt.legend(dummylines, labels, loc='best', prop={'size': 8})
+    plt.legend(dummylines, labels, loc='upper center', prop={'size': 8}, bbox_to_anchor=(0.5, 1.1), ncol=3, fancybox=True)
     for l in dummylines:
         l.set_visible(False)
 
