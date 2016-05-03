@@ -125,7 +125,7 @@ def multi_boxplots(xs, ysss, filename, ylim = None, labels = []):
     ysss = [ [ [ x x x x ], ... ], .... ]
     """
 
-    fig, axes = plt.subplots(1, 1, figsize=(12, 7))
+    fig, axes = plt.subplots(1, 1, figsize=(14, 7))
 
     k = len(ysss) + 1
     dummylines = []

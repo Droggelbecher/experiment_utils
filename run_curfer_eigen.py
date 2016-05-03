@@ -354,7 +354,7 @@ def test_partial_prediction(d):
 
         results = {}
 
-    for partial_length in (0.0, 0.1, 0.25, 0.5, 0.75):
+    for partial_length in (0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9):
         route_models = [
                 C(name = 'SimmonsNoF',
                     make = RouteModelSimmonsNoFeatures,
