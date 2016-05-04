@@ -277,6 +277,8 @@ def eval_metric(predicted, expected):
 
 def test_predict_route(model, partial, expected, features, stats):
 
+    assert len(partial) > 0
+
     exc = 0
 
     try:
@@ -287,7 +289,7 @@ def test_predict_route(model, partial, expected, features, stats):
         likelihood = 0
         exc = 1
 
-    score = eval_metric(predicted, expected)
+    score = eval_metric(partial + predicted, partial + expected)
 
     stats['exception'].append(exc)
     stats['length_partial'].append(len(partial))
@@ -327,14 +329,27 @@ def test_partial_prediction(d):
 
     with Timer("preparation"):
 
+        # Delete all empty/invalid routes and according entries
+        to_delete = []
+        for i, (route, coordinate_route, departure_time) in enumerate(zip(
+            d['routes'], d['coordinate_routes'], d['departure_times'])):
+            if len(route) == 0 or len(coordinate_route) == 0:
+                to_delete.append(i)
+
+        for i in reversed(to_delete):
+            del d['routes'][i]
+            del d['coordinate_routes'][i]
+            del d['departure_times'][i]
+
+
         # Preprocess routes:
         # 1. assign directions
         # 2. remove duplicates (so routes contain no cycles)
         routes = [
                     list(route_analysis.remove_duplicates(route_analysis.to_directed_arcs(route, coordinate_route, road_ids_to_endpoints)))
-                for route, coordinate_route, departure_time in
-                zip(d['routes'], d['coordinate_routes'], d['departure_times'])
-                ]
+                    for route, coordinate_route, departure_time in
+                    zip(d['routes'], d['coordinate_routes'], d['departure_times'])
+                    ]
         random.shuffle(routes, lambda: 0.42)
         print("total routes:", len(routes))
 
@@ -360,13 +375,13 @@ def test_partial_prediction(d):
                     make = RouteModelSimmonsNoFeatures,
                     stats = util.listdict()),
 
-                #C(name = 'Simmons',
-                    #make = RouteModelSimmons,
-                    #stats = util.listdict()),
-
-                C(name = 'SimmonsPCA1q.0',
-                    make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1), q = 0),
+                C(name = 'Simmons',
+                    make = RouteModelSimmons,
                     stats = util.listdict()),
+
+                #C(name = 'SimmonsPCA1q.0',
+                    #make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1), q = 0),
+                    #stats = util.listdict()),
 
                 C(name = 'SimmonsPCA1q.25',
                     make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1), q = 0.25),
@@ -384,13 +399,13 @@ def test_partial_prediction(d):
                     make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1), q = 1.0),
                     stats = util.listdict()),
 
-                C(name = 'SimmonsPCA1q2.0',
-                    make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1), q = 2.0),
-                    stats = util.listdict()),
+                #C(name = 'SimmonsPCA1q2.0',
+                    #make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1), q = 2.0),
+                    #stats = util.listdict()),
 
-                C(name = 'SimmonsPCA1q4.0',
-                    make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1), q = 4.0),
-                    stats = util.listdict()),
+                #C(name = 'SimmonsPCA1q4.0',
+                    #make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1), q = 4.0),
+                    #stats = util.listdict()),
 
                 C(name = 'SimmonsPCA1q8.0',
                     make = lambda: RouteModelSimmonsPCA(PCA(n_components = 1), q = 8.0),
