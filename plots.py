@@ -75,6 +75,22 @@ def relation(xs, ys, filename, xlabel=None, ylabel=None, pointlabels = []):
     fig.savefig(filename, dpi=100)
     plt.close(fig)
 
+
+def curves(xs, yss, filename, labels = []):
+    fig, ax = plt.subplots(1, 1)
+
+    ax.set_xscale('log', basex=2)
+
+    for ys, c, label in zip(yss, plt.cm.Set1(np.linspace(0, 1, len(yss))), labels):
+        ax.plot(xs, ys, 'o-', c = c, label = label)
+
+    ax.legend(loc='upper center', prop={'size': 8}, bbox_to_anchor=(0.5, 1.1), ncol=2, fancybox=True)
+    fig.savefig(filename)
+    plt.close(fig)
+
+
+
+
 def cdfs(a, filename):
     """
     a: [ { 'label': 'foo', 'values': [ ... ] }, ... ]
