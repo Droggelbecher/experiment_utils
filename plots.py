@@ -76,13 +76,22 @@ def relation(xs, ys, filename, xlabel=None, ylabel=None, pointlabels = []):
     plt.close(fig)
 
 
-def curves(xs, yss, filename, labels = []):
+def curves(xs, yss, filename, labels = [], invert_x = False, xlabel = None, ylabel = None):
     fig, ax = plt.subplots(1, 1)
 
     ax.set_xscale('log', basex=2)
 
+    if invert_x:
+        ax.invert_xaxis()
+
     for ys, c, label in zip(yss, plt.cm.Set1(np.linspace(0, 1, len(yss))), labels):
-        ax.plot(xs, ys, 'o-', c = c, label = label)
+        ax.plot(xs, ys, '-', c = c, label = label)
+
+    if xlabel:
+        ax.set_xlabel(xlabel)
+
+    if ylabel:
+        ax.set_ylabel(ylabel)
 
     ax.legend(loc='upper center', prop={'size': 8}, bbox_to_anchor=(0.5, 1.1), ncol=2, fancybox=True)
     fig.savefig(filename)
