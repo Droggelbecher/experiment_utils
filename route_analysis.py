@@ -3,48 +3,50 @@
 import numpy as np
 import scipy
 import scipy.sparse
-import csv
+#import csv
 import sys
 from datetime import datetime
 import math
 from collections import Counter
 
 from features import Features, Feature
-import geo
+import metrics
 
-csv.field_size_limit(sys.maxsize)
+#csv.field_size_limit(sys.maxsize)
 
 class Routes:
-
-    # TODO: Having a fixed max distance is probably not so good (as it gives a strong bias to the distance metric),
-    # rather try scaling to the max distance in the dataset?
-
-    # in m, used for distance between eg. 2 destinations
-    MAX_CONCEIVABLE_DISTANCE = 10*1000
-
     def __init__(self, d):
         routes = d['routes']
         road_ids_to_endpoints = d['road_ids_to_endpoints']
+        #self.road_ids_to_endpoints = road_ids_to_endpoints
         coordinate_routes = d['coordinate_routes']
 
-        sorted_road_ids = np.array(sorted(road_ids_to_endpoints.keys()))
+        self.cv_range = (0, 0)
+
+        self.routes = routes
+
+        sorted_road_ids = np.array(sorted(road_ids_to_endpoints.keys()), dtype='int64, int8')
+        self.id_to_idx = { tuple(id_): idx for (idx, id_) in enumerate(sorted_road_ids) }
+        self.endpoints = np.array([road_ids_to_endpoints[tuple(id_)] for id_ in sorted_road_ids])
+        self.startpoints = np.array([road_ids_to_endpoints[id_[0], 1 - id_[1]] for id_ in sorted_road_ids])
+
+        #print(self.id_to_idx)
+        #print(sorted_road_ids)
 
         self.F = Features(
-                Feature('weekdays',  ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'], weight = 0.0),
-                Feature('hours',     np.arange(0, 24, 1.0),                      weight = 0.0),
-                Feature('arrival',   ('lat', 'lon'),                             weight = 0.2),
-                Feature('departure', ('lat', 'lon'),                             weight = 0.0),
-                Feature('route',     sorted_road_ids,                            weight = 0.8),
-                Feature('arrival_arcs', sorted_road_ids,                         weight = 0.0),
+                Feature('weekdays',     np.arange(0, 7, 1.0),  'chist_wrap', weight = 0.0),
+                Feature('hours',        np.arange(0, 24, 1.0), 'chist_wrap', weight = 0.0),
+                Feature('arrival',      ('lat', 'lon'),        'geo', weight = 0.00),
+                Feature('departure',    ('lat', 'lon'),        'geo', weight = 0.00),
+                Feature('route',        sorted_road_ids,       'set', weight = 1.0),
+                Feature('arrival_arcs', sorted_road_ids,       'set', weight = 0.0),
                 )
-
-        self.endpoints = np.array([road_ids_to_endpoints[id_] for id_ in sorted_road_ids])
 
         a_arrival = np.array([c[-1] for c in coordinate_routes])
         a_departure = np.array([c[0] for c in coordinate_routes])
 
         # Departure Time
-
+        #
         a_weekdays = np.zeros(shape=(len(routes), 7))
         a_hours = np.zeros(shape=(len(routes), len(self.F.hours)))
         for i, departure_time in enumerate(d['departure_times']):
@@ -64,11 +66,21 @@ class Routes:
             except TypeError:
                 pass
 
-        #self.sorted_road_ids = sorted_road_ids
-        a_road_ids, a_arrival_arcs = routes_to_array(routes, sorted_road_ids)
+        #
+        # guess partial adjacency matrix from data
+        #
+        A = np.zeros(shape=(len(road_ids_to_endpoints), len(road_ids_to_endpoints)))
+        idx = self.id_to_idx
+        for route in routes:
+            for id1, id2 in zip(route, route[1:]):
+                A[idx[id1], idx[id2]] = 1.0
+
+        self.A = A
+
+        a_road_ids, a_arrival_arcs = routes_to_array(routes, self.id_to_idx)
 
         # TODO: this needs to stay consistent with the offsets above
-        self.X = np.hstack((
+        self._X = np.hstack((
             a_weekdays,
             a_hours,
             a_arrival,
@@ -77,33 +89,67 @@ class Routes:
             a_arrival_arcs
             ))
 
-    @staticmethod
-    def _jaccard_dist(a, b):
-        intersection = np.sum(a * b)
-        union = np.sum(a + b)
-        return 1.0 - float(intersection) / float(union)
+        #r0 = np.zeros(self._X.shape[1])
+        #r1 = np.zeros(self._X.shape[1])
+        #print(self.distance(r0, r1, features=['route']))
+        #r0[self.F.route.start] = 1
+        #r1[self.F.route.start ] = 1
+        #r1[self.F.route.start + 1] = 1
+        #print(self.distance(r0, r1, features=['route']))
+        #assert False
 
+    def get_learn_X(self):
+        return np.vstack((self._X[:self.cv_range[0],:], self._X[self.cv_range[1]:,:]))
 
-    def _nonroute_dist(self, a, b):
-        dist_hours = abs(self.F.hours.b_mean(a) - self.F.hours.b_mean(b)) / 24.0
-        dist_weekdays = 0.0 if np.all(self.F.weekdays(a) == self.F.weekdays(b)) else 1.0
-        dist_arrival = geo.distance(self.F.arrival(a), self.F.arrival(b)) / self.MAX_CONCEIVABLE_DISTANCE
-        dist_arrival = min(dist_arrival, 1.0)
-        dist_departure = geo.distance(self.F.departure(a), self.F.departure(b)) / self.MAX_CONCEIVABLE_DISTANCE
-        dist_departure = min(dist_departure, 1.0)
+    def get_validation_X(self):
+        return self._X[self.cv_range[0], self.cv_range[1]]
 
-        return (dist_hours * self.F.hours.weight
-                + dist_weekdays * self.F.weekdays.weight
-                + dist_arrival * self.F.arrival.weight
-                + dist_departure * self.F.departure.weight)
+    def get_validation_features(self, i):
+        return self.F.all_except('route', self._X[self.cv_range[0] + i])
 
-    def distance_jaccard(self, r1, r2):
-        if len(r1) == self.X.shape[1]:
-            nr = self._nonroute_dist(r1, r2) 
-            j = Routes._jaccard_dist(self.F.route(r1), self.F.route(r2)) * self.F.route.weight
-            return nr + j
-        else:
-            return 0.0
+    def get_features(self, a):
+        return self.F.all_except('route', a)
+
+    def route_to_array(self, route):
+        """
+        Turn a list of road ids into a data row compatible with self.X
+        """
+        route, arrival, unknowns = routes_to_array([route], self.id_to_idx, unknowns = 'count')
+        return self.F.assemble(route = route), unknowns
+
+    def array_to_route(self, r):
+        """
+        Turn array into a set of road ids (that is without order)
+
+        >>> r = list(range(100))
+        >>> r2 = array_to_route( route_to_array(r) )
+        >>> set(r) == set(r)
+        True
+        """
+        return self.F.route.keys[self.F.route(r) != 0]
+
+    def array_to_point_pairs(self, r):
+        route = self.F.route(r)
+        s = self.startpoints[route != 0, :]
+        e = self.endpoints[route != 0, :]
+        point_pairs = [(tuple(sx), tuple(ex)) for sx, ex in zip(s, e)]
+        return point_pairs
+
+    def distance(self, r1, r2, **kws):
+        return self.F.distance(r1, r2, **kws)
+
+    def nearest_neighbor(self, r, **kws):
+        d_min = float('inf')
+        r_min = None
+
+        for r2 in self.get_learn_X():
+            d = self.distance(r, r2, **kws)
+            if d < d_min:
+                d_min = d
+                r_min = r2
+
+        return r_min, d_min
+
 
 def to_directed_arcs(route, coordinate_route, road_ids_to_endpoints):
     """
@@ -126,8 +172,8 @@ def to_directed_arcs(route, coordinate_route, road_ids_to_endpoints):
             continue
             #continue
 
-        dist_enter = geo.distance(coord, enter)
-        dist_leave = geo.distance(coord, leave)
+        dist_enter = metrics.geo(coord, enter)
+        dist_leave = metrics.geo(coord, leave)
 
         assert enter != leave
 
@@ -157,29 +203,39 @@ def remove_duplicates(route):
 
 
 
-def routes_to_array(routes, ids):
+def routes_to_array(routes, ids, unknowns = 'raise'):
     """
     routes: iterable over (iterable over route ids)
-    ids: array of all possible road ids, sorted
+    ids: dict: id->idx
 
     return: sparse matrix with shape (len(routes), len(ids)),
         containing 1 if road id belongs to that route
     """
-    #a = scipy.sparse.lil_matrix(0, (len(routes), len(ids)), dtype=np.bool_)
+    assert type(ids) is dict
+
     a = np.zeros(shape=(len(routes), len(ids)))
     a_arrival = np.zeros(shape=(len(routes), len(ids)))
 
+    u = 0
+
     for i, route in enumerate(routes):
         for r in route:
-            # linear search to find route index from route id
-            for j, id_ in enumerate(ids):
-                if id_ == r:
-                    a[i, j] = 1
-                    break
-        for j, id_ in enumerate(ids):
-            if id_ == route[-1]:
-                a_arrival[i, j] = 1
-    return a, a_arrival
+            try:
+                rid = ids[r]
+            except IndexError as e:
+                u += 1
+                if unknowns == 'raise':
+                    raise
+            else:
+                a[i, rid] = 1
+
+        if unknowns == 'raise' or route[-1] in ids:
+            a_arrival[i, ids[route[-1]]] = 1
+
+    if unknowns == 'raise':
+        return a, a_arrival
+    else:
+        return a, a_arrival, u
 
 
 

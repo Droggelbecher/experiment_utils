@@ -89,6 +89,8 @@ def generate_gmaps(
         info = [],
         default_color = '#000000'
         ):
+
+    lines = list(lines)
     
     r = '''
 <!DOCTYPE html>
