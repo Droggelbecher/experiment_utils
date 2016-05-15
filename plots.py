@@ -52,7 +52,8 @@ def all_relations(a, filename, labels = None):
     f.savefig(filename, dpi=100)
     plt.close(f)
 
-def relation(xs, ys, filename, xlabel=None, ylabel=None, pointlabels = []):
+def relation(xs, ys, filename, xlabel=None, ylabel=None, pointlabels = [],
+        xlim = None):
     xsl = list(xs)
     ysl = list(ys)
 
@@ -67,6 +68,9 @@ def relation(xs, ys, filename, xlabel=None, ylabel=None, pointlabels = []):
         ax.set_xlabel(xlabel)
     if ylabel:
         ax.set_ylabel(ylabel)
+
+    if xlim is not None:
+        ax.set_xlim(xlim)
 
     if pointlabels:
         for x, y, l in zip(xsl, ysl, pointlabels):

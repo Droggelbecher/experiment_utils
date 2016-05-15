@@ -27,9 +27,25 @@ class Features:
 
     def assemble(self, **kws):
         r = np.zeros(self._len)
-        for k, v in kws.items():
-            f = getattr(self, k)
-            r[f.start:f.end] = v
+        idx = 0
+        rest_idx = 0
+        rest = np.zeros(self._len)
+        if '_rest' in kws and kws['_rest'] is not None:
+            rest = kws['_rest']
+
+        while idx < self._len:
+            for k, v in kws.items():
+                if k == '_rest': continue
+                f = getattr(self, k)
+                if f.start == idx:
+                    r[f.start:f.end] = v
+                    idx = f.end + 1
+                    break
+            else:
+                r[idx] = rest[rest_idx]
+                idx += 1
+                rest_idx += 1
+
         return r
 
     def all_except(self, featname, a):

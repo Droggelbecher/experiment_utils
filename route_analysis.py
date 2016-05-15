@@ -23,7 +23,7 @@ class Routes:
 
         self.cv_range = (0, 0)
 
-        self.routes = routes
+        self._routes = routes
 
         sorted_road_ids = np.array(sorted(road_ids_to_endpoints.keys()), dtype='int64, int8')
         self.id_to_idx = { tuple(id_): idx for (idx, id_) in enumerate(sorted_road_ids) }
@@ -88,15 +88,22 @@ class Routes:
             a_road_ids,
             a_arrival_arcs
             ))
+    def _validation_index_to_abs(self, i):
+        return self.cv_range[0] + i
 
-        #r0 = np.zeros(self._X.shape[1])
-        #r1 = np.zeros(self._X.shape[1])
-        #print(self.distance(r0, r1, features=['route']))
-        #r0[self.F.route.start] = 1
-        #r1[self.F.route.start ] = 1
-        #r1[self.F.route.start + 1] = 1
-        #print(self.distance(r0, r1, features=['route']))
-        #assert False
+    def _learn_index_to_abs(self, i):
+        return i if i < self.cv_range[0] else self.cv_range[1] + i
+
+    def _learn_range(self):
+        for i in range(self.cv_range[0]):
+            yield i
+        for i in range(self.cv_range[1], self._X.shape[0]):
+            yield i
+
+    def _validation_range(self):
+        for i in range(self.cv_range[0], self.cv_range[1]):
+            yield i
+
 
     def get_learn_X(self):
         return np.vstack((self._X[:self.cv_range[0],:], self._X[self.cv_range[1]:,:]))
@@ -104,18 +111,38 @@ class Routes:
     def get_validation_X(self):
         return self._X[self.cv_range[0], self.cv_range[1]]
 
-    def get_validation_features(self, i):
-        return self.F.all_except('route', self._X[self.cv_range[0] + i])
+
+    def get_learn_routes(self):
+        for i in self._learn_range():
+            yield self._routes[i]
+
+    def get_validation_routes(self):
+        for i in self._validation_range():
+            yield self._routes[i]
+
+
+    def get_learn_features(self):
+        for i in self._learn_range():
+            yield self.F.all_except('route', self._X[i])
+
+    def get_validation_features(self):
+        for i in self._validation_range():
+            yield self.F.all_except('route', self._X[i])
+
+
 
     def get_features(self, a):
-        return self.F.all_except('route', a)
+        if isinstance(a, int):
+            return self.F.all_except('route', self._X[a])
+        else:
+            return self.F.all_except('route', a)
 
-    def route_to_array(self, route):
+    def route_to_array(self, route, default = 0.0, features = None):
         """
         Turn a list of road ids into a data row compatible with self.X
         """
-        route, arrival, unknowns = routes_to_array([route], self.id_to_idx, unknowns = 'count')
-        return self.F.assemble(route = route), unknowns
+        route, arrival, unknowns = routes_to_array([route], self.id_to_idx, unknowns = 'count', default = default)
+        return self.F.assemble(route = route, _rest = features), unknowns
 
     def array_to_route(self, r):
         """
@@ -203,7 +230,7 @@ def remove_duplicates(route):
 
 
 
-def routes_to_array(routes, ids, unknowns = 'raise'):
+def routes_to_array(routes, ids, unknowns = 'raise', default = 0.0):
     """
     routes: iterable over (iterable over route ids)
     ids: dict: id->idx
@@ -213,8 +240,8 @@ def routes_to_array(routes, ids, unknowns = 'raise'):
     """
     assert type(ids) is dict
 
-    a = np.zeros(shape=(len(routes), len(ids)))
-    a_arrival = np.zeros(shape=(len(routes), len(ids)))
+    a = np.full((len(routes), len(ids)), default)
+    a_arrival = np.full((len(routes), len(ids)), default)
 
     u = 0
 
@@ -229,7 +256,7 @@ def routes_to_array(routes, ids, unknowns = 'raise'):
             else:
                 a[i, rid] = 1
 
-        if unknowns == 'raise' or route[-1] in ids:
+        if len(route) and (unknowns == 'raise' or route[-1] in ids):
             a_arrival[i, ids[route[-1]]] = 1
 
     if unknowns == 'raise':
