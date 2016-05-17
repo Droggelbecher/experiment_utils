@@ -41,6 +41,21 @@ def generate_html_bar_graph(heights, names = None):
 
     return r
 
+def polylines(ll):
+    """
+    ll = [
+            [(lat, lon), (lat, lon), (lat, lon), ...]
+            ...
+         ]
+    """
+    for l, c in zip(ll, plt.cm.Set2(np.linspace(0, 1, len(ll)))):
+        yield {
+                'path': [ { 'lat': lat, 'lng': lng } for lat, lng in l ],
+                'strokeColor': rgb2hex(c),
+                'strokeWeight': 2,
+                'strokeOpacity': 0.8,
+                }
+
 def weighted_lines(weights, endpoints, color_pos = '#00ff00', color_neg = '#ff0000', opacity = 0.5):
     min_weight = min(weights)
     max_weight = max(weights)
@@ -75,7 +90,7 @@ def line_sets(ll):
                     'path': [ { 'lat': from_[0], 'lng': from_[1] }, { 'lat': to[0], 'lng': to[1] } ],
                     'strokeColor': rgb2hex(c),
                     'strokeWeight': 4,
-                    'strokeOpacity': 0.8,
+                    'strokeOpacity': 0.5,
                   }
 
 
@@ -91,6 +106,16 @@ def generate_gmaps(
         ):
 
     lines = list(lines)
+
+    _markers = markers
+    markers = []
+
+    for m in _markers:
+        if isinstance(m, tuple):
+            # just a coordinate
+            markers.append({ 'position': { 'lat': m[0], 'lng': m[1] }, 'title': '' })
+        else:
+            markers.append(m)
     
     r = '''
 <!DOCTYPE html>
@@ -156,12 +181,7 @@ function initialize()
     }}
 
     for(var i = 0; i < markers.length; i++) {{
-        var marker = new google.maps.Marker({{
-          position: markers[i],
-          title:"x"
-          }});
-
-        marker.setMap(map);
+        markers[i].setMap(map);
     }}
 
     for(var i = 0; i < circles.length; i++) {{
@@ -190,7 +210,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
 '''.format(
         center[0], center[1],
         ',\n'.join('new google.maps.Polyline({})'.format(json.dumps(l)) for l in lines),
-        ',\n'.join('new google.maps.LatLng({}, {})'.format(lat, lon) for (lat, lon) in markers),
+        ',\n'.join('new google.maps.Marker({})'.format(json.dumps(m)) for m in markers),
         ',\n'.join('{{location: new google.maps.LatLng({}, {}), weight: {:.8f} }}'.format(lat, lon, float(w)) for (lat, lon, w) in heatmap),
         ','.join('new google.maps.Circle({})'.format(json.dumps(c)) for c in circles),
         '<br />\n'.join(info)
