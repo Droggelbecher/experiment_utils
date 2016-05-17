@@ -21,6 +21,9 @@ class Routes:
         road_ids_to_endpoints = d['road_ids_to_endpoints']
         #self.road_ids_to_endpoints = road_ids_to_endpoints
         coordinate_routes = d['coordinate_routes']
+        self._coordinate_routes = coordinate_routes
+
+        assert len(routes) == len(coordinate_routes)
 
         self.cv_range = (0, 0)
 
@@ -28,8 +31,8 @@ class Routes:
 
         sorted_road_ids = np.array(sorted(road_ids_to_endpoints.keys()), dtype='int64, int8')
         self.id_to_idx = { tuple(id_): idx for (idx, id_) in enumerate(sorted_road_ids) }
-        self.endpoints = np.array([road_ids_to_endpoints[tuple(id_)] for id_ in sorted_road_ids])
-        self.startpoints = np.array([road_ids_to_endpoints[id_[0], 1 - id_[1]] for id_ in sorted_road_ids])
+        self.startpoints = np.array([road_ids_to_endpoints[tuple(id_)] for id_ in sorted_road_ids])
+        self.endpoints = np.array([road_ids_to_endpoints[id_[0], 1 - id_[1]] for id_ in sorted_road_ids])
 
         #print(self.id_to_idx)
         #print(sorted_road_ids)
@@ -37,7 +40,7 @@ class Routes:
         self.F = Features(
                 Feature('weekdays',     np.arange(0, 7, 1.0),  'chist_wrap', weight = 0.0),
                 Feature('hours',        np.arange(0, 24, 1.0), 'chist_wrap', weight = 0.0),
-                #Feature('arrival',      ('lat', 'lon'),        'geo', weight = 0.00),
+                Feature('arrival',      ('lat', 'lon'),        'geo', weight = 0.00),
                 #Feature('departure',    ('lat', 'lon'),        'geo', weight = 0.00),
                 Feature('route',        sorted_road_ids,       'set', weight = 1.0),
                 #Feature('arrival_arcs', sorted_road_ids,       'set', weight = 0.0),
@@ -84,7 +87,7 @@ class Routes:
         self._X = np.hstack((
             a_weekdays,
             a_hours,
-            #a_arrival,
+            a_arrival,
             #a_departure,
             a_road_ids,
             #a_arrival_arcs
@@ -111,11 +114,18 @@ class Routes:
 
 
     def get_learn_X(self):
-        return np.vstack((self._X[:self.cv_range[0],:], self._X[self.cv_range[1]:,:]))
+        a = np.vstack((self._X[:self.cv_range[0],:], self._X[self.cv_range[1]:,:]))
+        assert a.shape[1] == self._X.shape[1]
+        assert a.shape[0] == self._X.shape[0] - (self.cv_range[1] - self.cv_range[0])
+        return a
 
     def get_validation_X(self):
         return self._X[self.cv_range[0], self.cv_range[1]]
 
+
+    def get_learn_coordinate_routes(self):
+        for i in self._learn_range():
+            yield self._coordinate_routes[i]
 
     def get_learn_routes(self):
         for i in self._learn_range():
@@ -228,11 +238,13 @@ def find_cycle(route):
 
     return None
 
-def remove_duplicates(route):
+def remove_duplicates(route, *related):
     seen = set()
     seen_add = seen.add
-    return [x for x in route if not (x in seen or seen_add(x))]
+    #return [x for x in route if not (x in seen or seen_add(x))]
 
+    z = zip(route, *related)
+    return zip(*[x for x in z if not (x[0] in seen or seen_add(x))])
 
 
 def routes_to_array(routes, ids, unknowns = 'raise', default = 0.0):
