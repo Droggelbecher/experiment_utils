@@ -146,11 +146,12 @@ class Routes:
 
 
 
-    def get_features(self, a):
+    def get_features(self, a, features = set()):
+        if not features:
+            features = self.F.get_names() - set(['route'])
         if isinstance(a, int):
-            return self.F.all_except('route', self._X[a])
-        else:
-            return self.F.all_except('route', a)
+            a = self._X[a]
+        return self.F.extract(a, features)
 
     def route_to_array(self, route, default = 0.0, features = None):
         """

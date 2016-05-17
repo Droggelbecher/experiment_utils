@@ -37,6 +37,12 @@ class Features:
         return d
 
     def assemble(self, **kws):
+        """
+        kws: feature name => value (=ndarray of correct size).
+            '_rest' will be used to fill up all non-addressed feature columns
+
+        return: ndarray of full row length with inserted features
+        """
         r = np.zeros(self._len)
         idx = 0
         rest_idx = 0
@@ -49,13 +55,41 @@ class Features:
                 if k == '_rest': continue
                 f = getattr(self, k)
                 if f.start == idx:
-                    r[f.start:f.end] = v
+                    if v is not None:
+                        r[f.start:f.end] = v
                     idx = f.end + 1
                     break
             else:
                 r[idx] = rest[rest_idx]
                 idx += 1
                 rest_idx += 1
+
+        return r
+
+    def get_feature(self, fname):
+        return getattr(self, fname)
+
+    def get_features(self, names):
+        for f in self.features:
+            if f.name in names:
+                yield f
+
+    def get_names(self):
+        return set(f.name for f in self.features)
+
+    def extract(self, a, fnames):
+        """
+        a: full data row to extract features from
+        features: iterable over feature names to extract
+        return: ndarray of requested features in row order
+        """
+        features = self.get_features(fnames)
+        l = sum(len(f) for f in features)
+        r = np.zeros(l)
+        i = 0
+        for f in self.get_features(features):
+            r[i:i + len(f)] = f(a)
+            i += len(f)
 
         return r
 
