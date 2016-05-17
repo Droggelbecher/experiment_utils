@@ -29,11 +29,11 @@ class Features:
         w = 1.0 / len(features)
 
         d = 0.0
-        for f in self.features:
-            if f.name in features:
-                if weights == 'default':
-                    w = f.weight
-                d += f.distance(a, b) * w
+        for fname in features:
+            f = getattr(self, fname)
+            if weights == 'default':
+                w = f.weight
+            d += f.distance(a, b) * w
         return d
 
     def assemble(self, **kws):
