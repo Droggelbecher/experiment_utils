@@ -14,6 +14,9 @@ class Features:
             p += len(f.keys)
         self._len = p
 
+    def __contains__(self, fname):
+        return hasattr(self, fname) and type(getattr(self, fname)) is Feature
+
     def distance(self, a, b, features=None, ignore_features=(), weights='default'):
         # sklearn calls this for testing with random integers (why the heck??!)
         if len(a) != self._len:
