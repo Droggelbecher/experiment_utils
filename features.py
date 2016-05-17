@@ -14,15 +14,23 @@ class Features:
             p += len(f.keys)
         self._len = p
 
-    def distance(self, a, b, features=None):
+    def distance(self, a, b, features=None, ignore_features=(), weights='default'):
         # sklearn calls this for testing with random integers (why the heck??!)
         if len(a) != self._len:
             return float('nan')
 
+        if features is None:
+            features = set([f.name for f in self.features])
+        features = set(features) - set(ignore_features)
+
+        w = 1.0 / len(features)
+
         d = 0.0
         for f in self.features:
-            if features is None or f.name in features:
-                d += f.distance(a, b) * f.weight
+            if f.name in features:
+                if weights == 'default':
+                    w = f.weight
+                d += f.distance(a, b) * w
         return d
 
     def assemble(self, **kws):
@@ -118,12 +126,12 @@ class Feature:
     #
 
     def chist_distance(self, a, b):
-        return np.average(self(a) * self.keys) - np.average(self(b) * self.keys)
+        return (np.average(self(a) * self.keys) - np.average(self(b) * self.keys)) / max(self.keys)
 
     def chist_wrap_distance(self, a, b):
         d = self.chist_distance(a, b)
         if d < 0:
-            return d + len(self)
+            return d + 1.0
         return d
 
     #
