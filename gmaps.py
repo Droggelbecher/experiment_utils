@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import rgb2hex
 import numpy as np
 
-
 def generate_html_bar_graph(heights, names = None):
     w = 30
     height = 100
@@ -76,7 +75,7 @@ def weighted_lines(weights, endpoints, color_pos = '#00ff00', color_neg = '#ff00
                 'strokeWeight': int(10.0*w_rel),
                 }
 
-def line_sets(ll):
+def line_sets(ll, arrows = False):
     """
     ll = [
              [((lat, lon), (lat, lon)), ((lat, lon), (lat, lon))],
@@ -86,12 +85,15 @@ def line_sets(ll):
     ll = list(ll)
     for line_set, c in zip(ll, plt.cm.Set1(np.linspace(0, 1, len(ll)))):
         for (from_, to) in line_set:
-            yield {
+            d = {
                     'path': [ { 'lat': from_[0], 'lng': from_[1] }, { 'lat': to[0], 'lng': to[1] } ],
                     'strokeColor': rgb2hex(c),
                     'strokeWeight': 4,
                     'strokeOpacity': 0.5,
                   }
+            if arrows:
+                d.update({ '_ARROW': True })
+            yield d
 
 
 
@@ -107,16 +109,30 @@ def generate_gmaps(
 
     lines = list(lines)
 
-    _markers = markers
-    markers = []
-
-    for m in _markers:
-        if isinstance(m, tuple):
+    ms = []
+    for m in markers:
+        d = m
+        if isinstance(m, tuple) or isinstance(m, np.ndarray):
             # just a coordinate
-            markers.append({ 'position': { 'lat': m[0], 'lng': m[1] }, 'title': '' })
-        else:
-            markers.append(m)
-    
+            d = { 'position': { 'lat': m[0], 'lng': m[1] }, 'title': '' }
+        ms.append(d)
+    s_markers = ',\n'.join('new google.maps.Marker({})'.format(json.dumps(m)) for m in ms)
+
+
+    ls = []
+    for l in lines:
+        d = {}
+        for k, v in l.items():
+            if k == '_ARROW':
+                d['icons'] = "[{ icon: { path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW }, offset: '100%' }]"
+            else:
+                d[k] = json.dumps(v)
+
+        s = '{ ' + ','.join('{}: {}'.format(k, v) for k,v in d.items()) + '}'
+        ls.append(s)
+    s_lines = ',\n'.join('new google.maps.Polyline({})'.format(l) for l in ls)
+
+
     r = '''
 <!DOCTYPE html>
 <html>
@@ -168,7 +184,8 @@ function initialize()
         zoom: 13,
         mapTypeControlOptions: {{
             mapTypeIds: [google.maps.MapTypeId.ROADMAP, customMapTypeId]
-            }}
+            }},
+        scaleControl: true
     }};
 
     var map = new google.maps.Map(document.getElementById("googleMap"),mapProp);
@@ -209,8 +226,9 @@ google.maps.event.addDomListener(window, 'load', initialize);
 </html>
 '''.format(
         center[0], center[1],
-        ',\n'.join('new google.maps.Polyline({})'.format(json.dumps(l)) for l in lines),
-        ',\n'.join('new google.maps.Marker({})'.format(json.dumps(m)) for m in markers),
+        s_lines, s_markers,
+        #',\n'.join('new google.maps.Polyline({})'.format(json.dumps(l)) for l in lines),
+        #',\n'.join('new google.maps.Marker({})'.format(json.dumps(m)) for m in markers),
         ',\n'.join('{{location: new google.maps.LatLng({}, {}), weight: {:.8f} }}'.format(lat, lon, float(w)) for (lat, lon, w) in heatmap),
         ','.join('new google.maps.Circle({})'.format(json.dumps(c)) for c in circles),
         '<br />\n'.join(info)
