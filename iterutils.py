@@ -24,5 +24,5 @@ class CV:
     def __iter__(self):
 
         for i in range(0, self.n, self._sz):
-            yield i, i + self._sz
+            yield i, min(i + self._sz, self.n)
 
