@@ -91,6 +91,7 @@ def line_sets(ll, arrows = False):
     assert type(ll[0][0][1][1]) in (float, np.float64, np.float32)
 
     ll = list(ll)
+    print("len(ll)=", len(ll))
     for line_set, c in zip(ll, plt.cm.Set1(np.linspace(0, 1, len(ll)))):
         for (from_, to) in line_set:
             d = {
@@ -117,6 +118,10 @@ def generate_gmaps(
 
     lines = list(lines)
 
+    #
+    # Markers
+    #
+
     ms = []
     for m in markers:
         d = m
@@ -126,6 +131,10 @@ def generate_gmaps(
         ms.append(d)
     s_markers = ',\n'.join('new google.maps.Marker({})'.format(json.dumps(m)) for m in ms)
 
+
+    #
+    # Lines
+    #
 
     ls = []
     for l in lines:
@@ -139,6 +148,18 @@ def generate_gmaps(
         s = '{ ' + ','.join('{}: {}'.format(k, v) for k,v in d.items()) + '}'
         ls.append(s)
     s_lines = ',\n'.join('new google.maps.Polyline({})'.format(l) for l in ls)
+
+    #
+    # Color Table
+    #
+
+    colors = []
+
+    for l in lines:
+        c = l['strokeColor']
+        if not len(colors) or c != colors[-1]:
+            colors.append(c)
+
 
 
     r = '''
@@ -228,6 +249,10 @@ google.maps.event.addDomListener(window, 'load', initialize);
 <body>
 <div id="googleMap" style="width:1000px;height:800px;"></div>
 
+<table border="0">
+<tr>{}</tr>
+</table>
+
 {}
 
 </body>
@@ -235,10 +260,10 @@ google.maps.event.addDomListener(window, 'load', initialize);
 '''.format(
         center[0], center[1],
         s_lines, s_markers,
-        #',\n'.join('new google.maps.Polyline({})'.format(json.dumps(l)) for l in lines),
-        #',\n'.join('new google.maps.Marker({})'.format(json.dumps(m)) for m in markers),
         ',\n'.join('{{location: new google.maps.LatLng({}, {}), weight: {:.8f} }}'.format(lat, lon, float(w)) for (lat, lon, w) in heatmap),
         ','.join('new google.maps.Circle({})'.format(json.dumps(c)) for c in circles),
+
+        ''.join('<td style="background-color: {};">{}</td>'.format(c, i) for i, c in enumerate(colors)),
         '<br />\n'.join(info)
         )
 
