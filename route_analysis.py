@@ -161,7 +161,7 @@ class Routes:
 
 
     def get_features(self, a, features = set()):
-        if not features:
+        if not features or len(features) == 0:
             features = self.F.get_names() - set(['route'])
         if isinstance(a, int):
             a = self._X[a]

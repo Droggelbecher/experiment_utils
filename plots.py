@@ -211,7 +211,7 @@ def multi_boxplots(xs, ysss, filename, ylim = (-0.05, 1.05), labels = [], toplab
                 axes.text(p, top * 0.95, label, horizontalalignment='center', size=12, weight='bold', color = c)
 
 
-    plt.legend(dummylines, labels, loc='lower center', prop={'size': 8}, bbox_to_anchor=(0.5, -0.1), ncol=3, fancybox=True)
+    plt.legend(dummylines, labels, loc='upper center', prop={'size': 8}, bbox_to_anchor=(0.5,1.1), ncol=3, fancybox=True)
     for l in dummylines:
         l.set_visible(False)
 

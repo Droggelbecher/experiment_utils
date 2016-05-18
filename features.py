@@ -83,12 +83,14 @@ class Features:
         features: iterable over feature names to extract
         return: ndarray of requested features in row order
         """
-        features = self.get_features(fnames)
+        print("extract({})".format(a.shape))
+
+        features = list(self.get_features(fnames))
         l = sum(len(f) for f in features)
-        r = np.zeros(l)
+        r = np.zeros(shape = a.shape[:-1] + (l,))
         i = 0
         for f in self.get_features(features):
-            r[i:i + len(f)] = f(a)
+            r[..., i:i + len(f)] = f(a)
             i += len(f)
 
         return r
@@ -109,7 +111,7 @@ class Feature:
         self.__dict__.update(kws)
 
     def __call__(self, a):
-        return a[self.start:self.end]
+        return a[...,self.start:self.end]
 
     def __len__(self):
         return len(self.keys)
