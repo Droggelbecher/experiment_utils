@@ -149,12 +149,27 @@ def boxplots(xs, yss, filename):
 
     plt.savefig(filename, dpi=100)
 
-def multi_boxplots(xs, ysss, filename, ylim = None, labels = []):
+def multi_boxplots(xs, ysss, filename, ylim = (-0.05, 1.05), labels = [], toplabels = []):
     """
-    ysss = [ [ [ x x x x ], ... ], .... ]
+    ysss = [
+            [ [ x x x x ], ... ],
+            [ [ x x x x ], ... ],
+            ....
+        ]
+
+    toplabels = [
+        [ 'color1box1', 'color1box2', ... ],
+        [ 'color2box1', 'color2box2', ... ],
+        ]
+
+    labels = ['color1', 'color2', 'color3', ...]
+
+    innermost list = data for 1 box
+    list of boxlists = data row (same color)
     """
 
     fig, axes = plt.subplots(1, 1, figsize=(14, 7))
+    top = ylim[1] * 1.1
 
     k = len(ysss) + 1
     dummylines = []
@@ -162,10 +177,15 @@ def multi_boxplots(xs, ysss, filename, ylim = None, labels = []):
     if len(labels) < len(ysss):
         labels += [str(i) for i in range(len(ysss) - len(labels))]
 
-    for yss, c, offset in zip(
+    if not toplabels:
+        toplabels = [ [] ] * len(ysss)
+
+    for yss, c, offset, tlables in zip(
             ysss,
             plt.cm.Set1(np.linspace(0, 1, len(ysss))),
-            range(1, 1 + len(ysss))):
+            range(1, 1 + len(ysss)),
+            toplabels
+            ):
         maxlen = max(maxlen, len(yss))
 
         # each yss is a data set and gets one color
@@ -176,6 +196,8 @@ def multi_boxplots(xs, ysss, filename, ylim = None, labels = []):
                 widths = 0.6,
                 positions = ps)
 
+        # Style the box
+
         for key, v in bp.items():
             for e in v:
                 plt.setp(e, color = c)
@@ -184,14 +206,19 @@ def multi_boxplots(xs, ysss, filename, ylim = None, labels = []):
         h, = plt.plot([1, 1], 'r-', c = c, color = c, linestyle='-')
         dummylines.append(h)
 
-    plt.legend(dummylines, labels, loc='upper center', prop={'size': 8}, bbox_to_anchor=(0.5, 1.1), ncol=3, fancybox=True)
+        if tlables:
+            for p, label in zip(ps, tlables):
+                axes.text(p, top * 0.95, label, horizontalalignment='center', size=12, weight='bold', color = c)
+
+
+    plt.legend(dummylines, labels, loc='lower center', prop={'size': 8}, bbox_to_anchor=(0.5, -0.1), ncol=3, fancybox=True)
     for l in dummylines:
         l.set_visible(False)
 
     plt.setp(axes, xticks = np.arange(k/2.0, k/2.0 + maxlen * k, k), xticklabels=xs)
     axes.set_xlim((0, maxlen * k))
-    if ylim is not None:
-        axes.set_ylim(ylim)
+    ylim = (ylim[0], top)
+    axes.set_ylim(ylim)
     fig.savefig(filename, dpi=100)
     plt.close(fig)
 

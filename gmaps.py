@@ -91,7 +91,6 @@ def line_sets(ll, arrows = False):
     assert type(ll[0][0][1][1]) in (float, np.float64, np.float32)
 
     ll = list(ll)
-    print("len(ll)=", len(ll))
     for line_set, c in zip(ll, plt.cm.Set1(np.linspace(0, 1, len(ll)))):
         for (from_, to) in line_set:
             d = {

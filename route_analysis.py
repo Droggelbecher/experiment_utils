@@ -225,7 +225,6 @@ def to_directed_arcs(route, coordinate_route, road_ids_to_endpoints):
 
             print("road_id {} not directable!".format(road_id))
             continue
-            #continue
 
         dist_enter = metrics.geo(coord, enter)
         dist_leave = metrics.geo(coord, leave)
