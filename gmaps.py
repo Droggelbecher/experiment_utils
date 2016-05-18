@@ -82,6 +82,14 @@ def line_sets(ll, arrows = False):
              ...
          ]
     """
+    assert len(ll[0][0]) == 2
+    assert len(ll[0][0][0]) == 2
+    assert len(ll[0][0][1]) == 2
+    assert type(ll[0][0][0][0]) in (float, np.float64, np.float32)
+    assert type(ll[0][0][0][1]) in (float, np.float64, np.float32)
+    assert type(ll[0][0][1][0]) in (float, np.float64, np.float32)
+    assert type(ll[0][0][1][1]) in (float, np.float64, np.float32)
+
     ll = list(ll)
     for line_set, c in zip(ll, plt.cm.Set1(np.linspace(0, 1, len(ll)))):
         for (from_, to) in line_set:

@@ -17,25 +17,39 @@ import metrics
 
 class Routes:
     def __init__(self, d):
-        routes = d['routes']
-        road_ids_to_endpoints = d['road_ids_to_endpoints']
-        #self.road_ids_to_endpoints = road_ids_to_endpoints
-        coordinate_routes = d['coordinate_routes']
-        self._coordinate_routes = coordinate_routes
-
-        assert len(routes) == len(coordinate_routes)
-
         self.cv_range = (0, 0)
 
-        self._routes = routes
+        #
+        # Conversion between road ids, indices and coordinates
+        #
+
+        road_ids_to_endpoints = d['road_ids_to_endpoints']
+        self.road_ids_to_endpoints = road_ids_to_endpoints
+
+        # keys are of form (road_id, direction_flag)
+        assert len(self.road_ids_to_endpoints.keys()[0]) == 2
+
+        # values are of form ( (lat,lon), (lat,lon) )
+        assert len(self.road_ids_to_endpoints.values()[0]) == 2
+        assert len(self.road_ids_to_endpoints.values()[0][0]) == 2
 
         sorted_road_ids = np.array(sorted(road_ids_to_endpoints.keys()), dtype='int64, int8')
         self.id_to_idx = { tuple(id_): idx for (idx, id_) in enumerate(sorted_road_ids) }
-        self.startpoints = np.array([road_ids_to_endpoints[tuple(id_)] for id_ in sorted_road_ids])
-        self.endpoints = np.array([road_ids_to_endpoints[id_[0], 1 - id_[1]] for id_ in sorted_road_ids])
+        #self.startpoints = np.array([road_ids_to_endpoints[tuple(id_)][0] for id_ in sorted_road_ids])
+        #self.endpoints = np.array([road_ids_to_endpoints[tuple(id_)][1] for id_ in sorted_road_ids])
+        self.idx_to_endpoints = np.array([road_ids_to_endpoints[tuple(id_)] for id_ in sorted_road_ids])
 
-        #print(self.id_to_idx)
-        #print(sorted_road_ids)
+        #
+        # Routes
+        #
+
+        routes = d['routes']
+        self._routes = routes
+
+        coordinate_routes = d['coordinate_routes']
+        self._coordinate_routes = coordinate_routes
+
+        assert len(self._routes) == len(self._coordinate_routes)
 
         self.F = Features(
                 Feature('weekdays',     np.arange(0, 7, 1.0),  'chist_wrap', weight = 0.0),
@@ -173,9 +187,7 @@ class Routes:
 
     def array_to_point_pairs(self, r):
         route = self.F.route(r)
-        s = self.startpoints[route != 0, :]
-        e = self.endpoints[route != 0, :]
-        point_pairs = [(tuple(sx), tuple(ex)) for sx, ex in zip(s, e)]
+        point_pairs = [(tuple(sx), tuple(ex)) for sx, ex in self.idx_to_endpoints[route != 0, :]]
         return point_pairs
 
     def distance(self, r1, r2, **kws):
@@ -219,9 +231,6 @@ def to_directed_arcs(route, coordinate_route, road_ids_to_endpoints):
         dist_leave = metrics.geo(coord, leave)
 
         assert enter != leave
-
-        #print("dist_enter", dist_enter, "dist_leave", dist_leave)
-        #assert dist_enter != dist_leave
 
         if dist_enter > dist_leave:
             yield (road_id, 0)
