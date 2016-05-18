@@ -182,7 +182,7 @@ def multi_boxplots(xs, ysss, filename, ylim = (-0.05, 1.05), labels = [], toplab
 
     for yss, c, offset, tlables in zip(
             ysss,
-            plt.cm.Set1(np.linspace(0, 1, len(ysss))),
+            plt.cm.Dark2(np.linspace(0, 1, len(ysss))),
             range(1, 1 + len(ysss)),
             toplabels
             ):

@@ -55,7 +55,7 @@ class Routes:
                 Feature('weekdays',     np.arange(0, 7, 1.0),  'chist_wrap', weight = 0.0),
                 Feature('hours',        np.arange(0, 24, 1.0), 'chist_wrap', weight = 0.0),
                 Feature('arrival',      ('lat', 'lon'),        'geo', weight = 0.00),
-                #Feature('departure',    ('lat', 'lon'),        'geo', weight = 0.00),
+                Feature('departure',    ('lat', 'lon'),        'geo', weight = 0.00),
                 Feature('route',        sorted_road_ids,       'set', weight = 1.0),
                 #Feature('arrival_arcs', sorted_road_ids,       'set', weight = 0.0),
                 )
@@ -102,7 +102,7 @@ class Routes:
             a_weekdays,
             a_hours,
             a_arrival,
-            #a_departure,
+            a_departure,
             a_road_ids,
             #a_arrival_arcs
             ))
