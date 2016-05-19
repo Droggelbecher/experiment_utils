@@ -17,6 +17,9 @@ class Features:
     def __contains__(self, fname):
         return hasattr(self, fname) and type(getattr(self, fname)) is Feature
 
+    def __len__(self):
+        return self._len
+
     def distance(self, a, b, features=None, ignore_features=(), weights='default'):
         # sklearn calls this for testing with random integers (why the heck??!)
         if len(a) != self._len:
@@ -33,7 +36,7 @@ class Features:
             f = getattr(self, fname)
             if weights == 'default':
                 w = f.weight
-            d += f.distance(a, b) * w
+            d += f.distance(f(a), f(b)) * w
         return d
 
     def assemble(self, **kws):
@@ -83,8 +86,6 @@ class Features:
         features: iterable over feature names to extract
         return: ndarray of requested features in row order
         """
-        print("extract({})".format(a.shape))
-
         features = list(self.get_features(fnames))
         l = sum(len(f) for f in features)
         r = np.zeros(shape = a.shape[:-1] + (l,))
@@ -99,86 +100,87 @@ class Features:
         f = getattr(self, featname)
         return np.hstack((a[:f.start], a[f.end:]))
 
-
 class Feature:
-    def __init__(self, name, keys, type_='set', **kws):
+    keys = ('value',)
+
+    def __init__(self, name):
         self.name = name
-        self.keys = keys
-
-        self.distance = getattr(self, type_ + '_distance', None)
-        self.mean = getattr(self, type_ + '_mean', None)
-
-        self.__dict__.update(kws)
 
     def __call__(self, a):
+        return a[...,self.start:self.end]
+
+    def encode(self, a, v):
+        a[...,self.start:self.end] = v
+
+    def decode(self, a):
         return a[...,self.start:self.end]
 
     def __len__(self):
         return len(self.keys)
 
-    #
-    # Categorial data, "one hot" encoding
-    # One value is assumed to be == 1.0 the rest to be == 0.0
-    # Warning: You will likely destroy this property when doing things like
-    # averaging, PCA, etc... across data rows
-    #
+class PlainFeature(Feature):
+    def __init__(self, name, range_ = None):
+        Feature.__init__(self, name)
+        self._range = range_
+        if self._range is not None:
+            self._delta = float(self._range[1] - self._range[0])
 
-    def cat_distance(self, a, b):
-        pa = np.where(self(a) == 1)[0][0]
-        pb = np.where(self(b) == 1)[0][0]
-        return pa - pb
+    def distance(self, a, b):
+        d = a - b
+        if self._range is not None:
+            return d / self._delta
+        return d
 
-    def cat_wrap_distance(self, a, b):
-        d = self.dist_cat(a, b)
-        if d < 0:
+class OneHotFeature(Feature):
+    def __init__(self, name, keys, wrap = False):
+        Feature.__init__(self, name)
+        self.keys = keys
+        self._wrap = wrap
+
+    def distance(self, a, b):
+        pa = np.where(a == 1)[0][0]
+        pb = np.where(b == 1)[0][0]
+        d = pa - pb
+        if self._wrap and d < 0:
             return d + len(self)
         return d
 
-    def cat_mean(self, a):
-        """
-        Feature is represented as a vector of bools,
-        keys are associated values.
-        Average over the values that are "true".
-        """
-        return np.average(self.__call__(a) * self.keys)
+    def encode(self, a, v):
+        v2 = np.zeros(len(self))
+        v2[v] = 1
+        Feature.encode(self, a, v)
 
-    #
-    # Set, vector of 1s and 0s,
-    # Like categorial but any number of 0s/1s allowed
-    #
+    def decode(self, a):
+        a = Feature.decode(self, a)
+        return np.average(a * self.keys)
 
-    def set_distance(self, a, b):
-        return metrics.jaccard(self(a), self(b))
+class BitSetFeature(Feature):
+    def __init__(self, name, keys):
+        Feature.__init__(self, name)
+        self.keys = keys
 
-    #
-    # Histogram
-    # Like set but allow arbitrary values
-    #
+    def distance(self, a, b):
+        return metrics.jaccard(a, b)
 
-    def hist_distance(self, a, b):
-        return metrics.chi_squared(self(a), self(b))
+class HistogramFeature(Feature):
+    def __init__(self, name, metric = 'chisquared', wrap = False):
+        Feature.__init__(self, name)
+        self._metric = metric
+        self._wrap = wrap
 
-    #
-    # Histogram
-    # Distance corresponds to difference of averages
-    # (and thus focusses on the X-Axis rather than Y)
-    #
+    def distance(self, a, b):
+        if self.metric == 'chisquared':
+            assert not self._wrap
+            return metrics.chi_squared(a, b)
+        else:
+            d = (np.average(a * self.keys) - np.average(b * self.keys)) / max(self.keys)
+            if self._wrap and d < 0:
+                return d + 1.0
+            return d
 
-    def chist_distance(self, a, b):
-        return (np.average(self(a) * self.keys) - np.average(self(b) * self.keys)) / max(self.keys)
-
-    def chist_wrap_distance(self, a, b):
-        d = self.chist_distance(a, b)
-        if d < 0:
-            return d + 1.0
-        return d
-
-    #
-    # Geo location (latitude, longitude)
-    #
-
-    def geo_distance(self, a, b):
-        return metrics.geo(self(a), self(b))
-
+class GeoFeature(Feature):
+    keys = ('lat', 'lng')
+    def distance(self, a, b):
+        return metrics.geo(a, b)
 
 
