@@ -72,11 +72,9 @@ class Routes:
         for i, c in enumerate(coordinate_routes):
             self.F.departure.encode(X[i, :], c[0])
             assert np.any(self.F.departure(X[i, :]) != 0)
-            print i, 'departure', self.F.departure(X[i, :])
 
             self.F.arrival.encode(X[i, :], c[-1])
             assert np.any(self.F.arrival(X[i, :]) != 0)
-            print i ,'arrival', self.F.arrival(X[i, :])
 
         #
         # Departure Time
@@ -170,6 +168,9 @@ class Routes:
         """
         route, arrival, unknowns = routes_to_array([route], self.id_to_idx, unknowns = 'count', default = default)
         return self.F.assemble(route = route, _rest = features), unknowns
+
+    def road_id_to_index(self, road_id):
+        return self.id_to_idx.get(road_id, None)
 
     def array_to_route(self, r):
         """

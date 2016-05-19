@@ -76,6 +76,8 @@ def relation(xs, ys, filename, xlabel=None, ylabel=None, pointlabels = [],
         for x, y, l in zip(xsl, ysl, pointlabels):
             ax.text(x, y, l, transform = trans_offset, fontsize=8)
 
+    ax.grid(True)
+
     fig.savefig(filename, dpi=100)
     plt.close(fig)
 
@@ -210,6 +212,7 @@ def multi_boxplots(xs, ysss, filename, ylim = (-0.05, 1.05), labels = [], toplab
             for p, label in zip(ps, tlables):
                 axes.text(p, top * 0.95, label, horizontalalignment='center', size=12, weight='bold', color = c)
 
+    axes.yaxis.grid(True)
 
     plt.legend(dummylines, labels, loc='upper center', prop={'size': 8}, bbox_to_anchor=(0.5,1.1), ncol=3, fancybox=True)
     for l in dummylines:

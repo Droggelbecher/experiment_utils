@@ -97,10 +97,13 @@ def export_graphviz(decision_tree, out_file="tree.dot", feature_names=None,
     ...     out_file='tree.dot')                # doctest: +SKIP
     """
 
+    if class_names is None:
+        class_names = [str(x) for x in range(len(decision_tree.classes_))]
+
     def pretty_samples(samples):
         s = ''
         if class_names is not None:
-            print(type(samples), samples)
+            #print(type(samples), samples)
             for i, n in enumerate(samples):
                 if n != 0:
                     s += '%s(%d) ' % (class_names[decision_tree.classes_[i]], int(n))
