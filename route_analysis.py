@@ -157,8 +157,6 @@ class Routes:
         for i in self._validation_range():
             yield self.F.all_except('route', self._X[i])
 
-
-
     def get_features(self, a, features = set()):
         if not features or len(features) == 0:
             features = self.F.get_names() - set(['route'])

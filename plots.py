@@ -230,7 +230,7 @@ def matrix(a, filename):
     print(4 * aspect_ratio, 4)
 
     fig, ax = plt.subplots(dpi=100)
-    cs = ax.matshow(a, cmap=plt.cm.gray)
+    cs = ax.matshow(a)
     fig.colorbar(cs)
     fig.savefig(filename, dpi=100)
     plt.close(fig)

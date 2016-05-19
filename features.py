@@ -70,12 +70,24 @@ class Features:
         return r
 
     def get_feature(self, fname):
+        assert isinstance(fname, str)
         return getattr(self, fname)
 
     def get_features(self, names):
         for f in self.features:
             if f.name in names:
                 yield f
+
+    def get_keys(self, featurenames):
+        r = []
+        features = list(self.get_features(featurenames))
+        for f in features:
+            if len(f.keys) == 1:
+                r.append(f.name)
+            else:
+                for k in f.keys:
+                    r.append('{}.{}'.format(f.name, k))
+        return r
 
     def get_names(self):
         return set(f.name for f in self.features)
@@ -90,7 +102,7 @@ class Features:
         l = sum(len(f) for f in features)
         r = np.zeros(shape = a.shape[:-1] + (l,))
         i = 0
-        for f in self.get_features(features):
+        for f in features:
             r[..., i:i + len(f)] = f(a)
             i += len(f)
 
