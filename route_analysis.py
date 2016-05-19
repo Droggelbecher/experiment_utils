@@ -10,8 +10,9 @@ from datetime import datetime
 import math
 from collections import Counter
 
-from features import Features, Feature
+from features import Features, PlainFeature, GeoFeature, BitSetFeature, OneHotFeature
 import metrics
+import plots
 
 #csv.field_size_limit(sys.maxsize)
 
@@ -35,8 +36,6 @@ class Routes:
 
         sorted_road_ids = np.array(sorted(road_ids_to_endpoints.keys()), dtype='int64, int8')
         self.id_to_idx = { tuple(id_): idx for (idx, id_) in enumerate(sorted_road_ids) }
-        #self.startpoints = np.array([road_ids_to_endpoints[tuple(id_)][0] for id_ in sorted_road_ids])
-        #self.endpoints = np.array([road_ids_to_endpoints[tuple(id_)][1] for id_ in sorted_road_ids])
         self.idx_to_endpoints = np.array([road_ids_to_endpoints[tuple(id_)] for id_ in sorted_road_ids])
 
         #
@@ -52,40 +51,52 @@ class Routes:
         assert len(self._routes) == len(self._coordinate_routes)
 
         self.F = Features(
-                Feature('weekdays',     np.arange(0, 7, 1.0),  'chist_wrap', weight = 0.0),
-                Feature('hours',        np.arange(0, 24, 1.0), 'chist_wrap', weight = 0.0),
-                Feature('arrival',      ('lat', 'lon'),        'geo', weight = 0.00),
-                Feature('departure',    ('lat', 'lon'),        'geo', weight = 0.00),
-                Feature('route',        sorted_road_ids,       'set', weight = 1.0),
-                #Feature('arrival_arcs', sorted_road_ids,       'set', weight = 0.0),
+                GeoFeature('departure'),
+                GeoFeature('arrival'),
+
+                PlainFeature('weekday', (0, 7)),
+                PlainFeature('hour', (0, 24)),
+
+                # Keeping  the one-hot variants now for data display in html
+                OneHotFeature('weekdays', range(7)),
+                OneHotFeature('hours', range(24)),
+
+                BitSetFeature('route', sorted_road_ids),
                 )
 
-        a_arrival = np.array([c[-1] for c in coordinate_routes])
-        a_departure = np.array([c[0] for c in coordinate_routes])
+        X = np.zeros(shape = (len(routes), len(self.F)))
 
+        #
+        # Arrival / Departure
+        #
+        for i, c in enumerate(coordinate_routes):
+            self.F.departure.encode(X[i, :], c[0])
+            assert np.any(self.F.departure(X[i, :]) != 0)
+            print i, 'departure', self.F.departure(X[i, :])
+
+            self.F.arrival.encode(X[i, :], c[-1])
+            assert np.any(self.F.arrival(X[i, :]) != 0)
+            print i ,'arrival', self.F.arrival(X[i, :])
+
+        #
         # Departure Time
         #
-        a_weekdays = np.zeros(shape=(len(routes), 7))
-        a_hours = np.zeros(shape=(len(routes), len(self.F.hours)))
         for i, departure_time in enumerate(d['departure_times']):
-            try:
-                dt = datetime.utcfromtimestamp(departure_time)
-                a_weekdays[i, dt.weekday()] = 1.0
+            dt = datetime.utcfromtimestamp(departure_time)
+            self.F.weekday.encode(X[i, :], dt.weekday())
+            self.F.hour.encode(X[i, :], dt.hour)
 
-                # Flag a '1' for all hour-categories that match.
-                # Each category is a centered range of length 1hr around each
-                # key, if eg. the resolution is 30min, there is always 2
-                # overlapping
-
-                for j, key in enumerate(self.F.hours.keys):
-                    if abs(key - dt.hour) < 1.0:
-                        a_hours[i, j] = 1.0
-
-            except TypeError:
-                pass
+            self.F.weekdays.encode(X[i, :], dt.weekday())
+            self.F.hours.encode(X[i, :], dt.hour)
 
         #
-        # guess partial adjacency matrix from data
+        # Actual Route
+        #
+        a_road_ids, a_arrival_arcs = routes_to_array(routes, self.id_to_idx)
+        self.F.route.encode(X, a_road_ids)
+
+        #
+        # Guess partial adjacency matrix from data
         #
         A = np.zeros(shape=(len(road_ids_to_endpoints), len(road_ids_to_endpoints)))
         idx = self.id_to_idx
@@ -93,22 +104,10 @@ class Routes:
             for id1, id2 in zip(route, route[1:]):
                 A[idx[id1], idx[id2]] = 1.0
 
+        plots.matrix(X[:,:100], '/tmp/X.png')
+
+        self._X = X
         self.A = A
-
-        a_road_ids, a_arrival_arcs = routes_to_array(routes, self.id_to_idx)
-
-        # TODO: this needs to stay consistent with the offsets above
-        self._X = np.hstack((
-            a_weekdays,
-            a_hours,
-            a_arrival,
-            a_departure,
-            a_road_ids,
-            #a_arrival_arcs
-            ))
-
-        #self._feature_density = KernelDensity(kernel='gaussian',
-                #bandwidth=1.0).fit(self.get_features(self._X))
 
     def _validation_index_to_abs(self, i):
         return self.cv_range[0] + i
@@ -198,7 +197,7 @@ class Routes:
         r_min = None
 
         for r2 in self.get_learn_X():
-            d = self.distance(r, r2, **kws)
+            d = self.distance(r, r2, weights='uniform', **kws)
             if d < d_min:
                 d_min = d
                 r_min = r2
