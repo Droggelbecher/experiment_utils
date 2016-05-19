@@ -148,7 +148,7 @@ class OneHotFeature(Feature):
     def encode(self, a, v):
         v2 = np.zeros(len(self))
         v2[v] = 1
-        Feature.encode(self, a, v)
+        Feature.encode(self, a, v2)
 
     def decode(self, a):
         a = Feature.decode(self, a)
