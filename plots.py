@@ -225,9 +225,14 @@ def multi_boxplots(xs, ysss, filename, ylim = (-0.05, 1.05), labels = [], toplab
 
 def matrix(a, filename):
     plt.clf()
-    fig, ax = plt.subplots(figsize=(4, .5), dpi=100)
-    ax.matshow(a, cmap=plt.cm.gray)
-    fig.savefig(filename, dpi=1000)
+
+    aspect_ratio = a.shape[1] / float(a.shape[0])
+    print(4 * aspect_ratio, 4)
+
+    fig, ax = plt.subplots(dpi=100)
+    cs = ax.matshow(a, cmap=plt.cm.gray)
+    fig.colorbar(cs)
+    fig.savefig(filename, dpi=100)
     plt.close(fig)
 
 
