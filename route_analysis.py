@@ -57,6 +57,9 @@ class Routes:
                 PlainFeature('weekday', (0, 7)),
                 PlainFeature('hour', (0, 24)),
 
+                # Minutes since midnight
+                PlainFeature('minute_of_day', (0, 24 * 60)),
+
                 # Keeping  the one-hot variants now for data display in html
                 OneHotFeature('weekdays', range(7)),
                 OneHotFeature('hours', range(24)),
@@ -83,6 +86,8 @@ class Routes:
             dt = datetime.utcfromtimestamp(departure_time)
             self.F.weekday.encode(X[i, :], dt.weekday())
             self.F.hour.encode(X[i, :], dt.hour)
+
+            self.F.minute_of_day.encode(X[i, :], dt.hour * 60 + dt.minute)
 
             self.F.weekdays.encode(X[i, :], dt.weekday())
             self.F.hours.encode(X[i, :], dt.hour)

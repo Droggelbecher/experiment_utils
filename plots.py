@@ -239,6 +239,41 @@ def matrix(a, filename):
     plt.close(fig)
 
 
+def kde1d(xs_plot, estimators, filename, xss_data = [], labels = None,
+        xlabel = None, xlim = None):
+
+    plt.clf()
+    fig, ax = plt.subplots(dpi=100)
+
+    if labels is None:
+        labels = ['KDE {}'.format(x) for x in range(len(estimators))]
+
+    cm = plt.cm.Set2(np.linspace(0, 1, len(estimators)))
+    alpha = 0.5
+    offs = 0.01
+    spread = 0.005
+    
+    for i, (kde, label, xs_data, c) in enumerate(zip(estimators, labels, xss_data, cm)):
+        log_dens = kde.score_samples(xs_plot.reshape(len(xs_plot), 1))
+        ax.fill(xs_plot, np.exp(log_dens), '-', label = label, alpha = alpha, fc
+                = c)
+
+        ax.legend(loc='best', prop={'size': 8})
+        ax.plot(xs_data, -(i+1) * offs + spread/2 - spread * np.random.random(len(xs_data)), 'o', c=c,
+                alpha=alpha)
+
+    if xlabel is not None:
+        ax.set_xlabel(xlabel)
+
+    if xlim is not None:
+        ax.set_xlim(xlim)
+
+    ax.grid(True)
+    fig.savefig(filename, dpi=100)
+
+    plt.close(fig)
+
+
 if __name__ == '__main__':
 
     a = [
