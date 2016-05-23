@@ -4,11 +4,14 @@ import csv
 import sys
 csv.field_size_limit(sys.maxsize)
 
+from cache import cached
+
 class ImplausibleRoute(Exception):
     def __init__(self, msg):
         Exception.__init__(self, msg)
 
-def extract_roadids(ttp_filename):
+@cached()
+def extract_roadids(ttp):
     """
     Requires a map-matched ttp 0.2
 
@@ -31,8 +34,7 @@ def extract_roadids(ttp_filename):
     arrival_time = None
     road_ids_to_endpoints = {}
 
-    f = open(ttp_filename, 'r')
-    csv_reader = csv.reader(f)
+    csv_reader = csv.reader(ttp.splitlines())
 
     prev_road_id = None
     prev_lat = None

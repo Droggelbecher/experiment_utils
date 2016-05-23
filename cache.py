@@ -153,7 +153,7 @@ def clear_caches():
 ALWAYS = lambda kws: True
 NEVER = lambda kws: False
 
-def cached(filename_kws=(), ignore_kws=(), add_filenames=(), cache_if=ALWAYS, compute_if=ALWAYS):
+def cached(filename_kws=(), ignore_kws=(), add_filenames=(), cache_if=ALWAYS, compute_if=ALWAYS, cache_exception = ALWAYS):
     """
     >>> @cached()
     ... def f(x):
@@ -186,20 +186,32 @@ def cached(filename_kws=(), ignore_kws=(), add_filenames=(), cache_if=ALWAYS, co
             filenames = set(kws[k] for k in filename_kws)
             if callable(add_filenames_):
                 add_filenames_ = add_filenames_(kws)
-            filenames.union(set(add_filenames_))
+            filenames = filenames.union(set(add_filenames_))
 
             # Get from cache if present and fresh
 
             cache_result, cache_data = _get_from_cache(cache_path, f, kws, ignore_kws, filenames)
             if cache_result == CACHE_AVAILABLE:
                 logging.debug("answering {}({}) from {}".format(f.__name__, kws, cache_path))
+                e = cache_data.get('exception', None)
+                if e is not None:
+                    raise e
                 return cache_data['return_value']
 
             # Compute
 
+            exception = None
             if compute_if(kws):
                 t = time.time()
-                r = f(**kws)
+
+                if cache_exception(kws):
+                    try:
+                        r = f(**kws)
+                    except Exception as e:
+                        exception = e
+                else:
+                    r = f(**kws)
+
                 dt = time.time() - t
 
             else:
@@ -208,13 +220,32 @@ def cached(filename_kws=(), ignore_kws=(), add_filenames=(), cache_if=ALWAYS, co
 
             # Save to cache
 
-            if cache_result != CACHE_COLLISION and cache_if(kws):
+            if exception is not None and cache_result != CACHE_COLLISION:
+                cache_data = {
+                    'timestamp':  time.time(),
+                    'computation_time': dt,
+                    'function_name':  f.__name__,
+                    'kws':  kws,
+                    'return_value':  None,
+                    'exception': e
+                }
+                if not os.path.exists(base_directory):
+                    os.mkdir(base_directory)
+
+                logging.debug("caching {}({}) [{:.2f}s] -> {}".format(f.__name__, kws, dt, cache_path))
+                cache_file = open(cache_path, 'wb')
+                pickle.dump(cache_data, cache_file)
+                cache_file.close()
+                raise e
+
+            elif cache_result != CACHE_COLLISION and cache_if(kws):
                 cache_data = {
                     'timestamp':  time.time(),
                     'computation_time': dt,
                     'function_name':  f.__name__,
                     'kws':  kws,
                     'return_value':  r,
+                    'exception': None,
                 }
 
                 if not os.path.exists(base_directory):
@@ -227,28 +258,5 @@ def cached(filename_kws=(), ignore_kws=(), add_filenames=(), cache_if=ALWAYS, co
             return r
         return new_f
     return decorate
-            
 
-
-#def hashablize(obj):
-    #"""Convert a container hierarchy into one that can be hashed.
-
-    #Don't use this with recursive structures!
-    #Also, this won't be useful if you pass dictionaries with
-    #keys that don't have a total order.
-    #Actually, maybe you're best off not using this function at all.
-    
-    #Source: http://stackoverflow.com/questions/985294/is-the-pickling-process-deterministic
-    #"""
-    #try:
-        #hash(obj)
-    #except TypeError:
-        #if isinstance(obj, dict):
-            #return tuple((k, hashablize(v)) for (k, v) in sorted(obj.items()))
-        #elif hasattr(obj, '__iter__'):
-            #return tuple(hashablize(o) for o in obj)
-        #else:
-            #raise TypeError("Can't hashablize object of type %r" % type(obj))
-    #else:
-        #return obj
 
