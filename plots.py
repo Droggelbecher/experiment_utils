@@ -20,8 +20,6 @@ def all_relations(a, filename, labels = None):
     if labels is None:
         labels = [str(x) for x in range(features)]
 
-    #plt.xlim((np.min(a), np.max(a)))
-    #plt.ylim((np.min(a), np.max(a)))
     for row in range(1, features):
         for column in range(features - 1):
             if column < row:
@@ -240,7 +238,7 @@ def matrix(a, filename):
 
 
 def kde1d(xs_plot, estimators, filename, xss_data = [], labels = None,
-        xlabel = None, xlim = None):
+        xlabel = None, xlim = None, lines = [], grid = True):
 
     plt.clf()
     fig, ax = plt.subplots(dpi=100)
@@ -268,7 +266,10 @@ def kde1d(xs_plot, estimators, filename, xss_data = [], labels = None,
     if xlim is not None:
         ax.set_xlim(xlim)
 
-    ax.grid(True)
+    for line in lines:
+        ax.axvline(c = 'grey', linestyle = '-', x = line)
+
+    ax.grid(grid)
     fig.savefig(filename, dpi=100)
 
     plt.close(fig)
