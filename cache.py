@@ -55,8 +55,6 @@ def cache_hash(obj):
     True
     """
 
-    logging.debug("hashing {} of type {} ".format(obj, type(obj)))
-
     if isinstance(obj, dict):
         r = cache_hash(tuple( (k, v) for k, v in sorted(obj.items(), key=lambda p: cache_hash(p[0]))))
 

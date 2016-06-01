@@ -1,12 +1,16 @@
 #!/usr/bin/env python
 
 import numpy as np
+import math
 
 #import matplotlib
 #matplotlib.use('TkAgg')
 
 import matplotlib.pyplot as plt
 import matplotlib.transforms as mtrans
+
+from matplotlib import rc
+rc('text', usetex=True)
 
 def all_relations(a, filename, labels = None):
     """
@@ -47,7 +51,7 @@ def all_relations(a, filename, labels = None):
     #plt.autoscale()
 
     f.set_size_inches((2*features, 2*features))
-    f.savefig(filename, dpi=100)
+    f.savefig(filename, dpi=100, bbox_inches='tight')
     plt.close(f)
 
 def relation(xs, ys, filename, xlabel=None, ylabel=None, pointlabels = [],
@@ -79,17 +83,76 @@ def relation(xs, ys, filename, xlabel=None, ylabel=None, pointlabels = [],
     fig.savefig(filename, dpi=100)
     plt.close(fig)
 
+def relations(xss, yss, filename, xlabel=None, ylabel=None, pointlabels = [],
+        xlim = None, labels = []):
+    xss = list(xss)
+    yss = list(yss)
 
-def curves(xs, yss, filename, labels = [], invert_x = False, xlabel = None, ylabel = None):
+    plt.clf()
+    fig = plt.figure()
+    ax = plt.subplot(111)
+
+    trans_offset = mtrans.offset_copy(ax.transData, fig=fig, x = 0.05, y = 0.1, units='inches')
+
+    if len(labels) < len(xss):
+        labels += [''] * (len(xss) - len(labels))
+
+    for xsl, ysl, c, label in zip(xss, yss, plt.cm.Dark2(np.linspace(0, 1, len(xss))), labels):
+        ax.scatter(xsl, ysl, c = c, alpha=0.5, label=label)
+        if pointlabels:
+            for x, y, l in zip(xsl, ysl, pointlabels):
+                ax.text(x, y, l, transform = trans_offset, fontsize=8)
+
+    if xlabel:
+        ax.set_xlabel(xlabel)
+    if ylabel:
+        ax.set_ylabel(ylabel)
+
+    if xlim is not None:
+        ax.set_xlim(xlim)
+
+
+    plt.legend(loc='upper center', prop={'size': 10}, bbox_to_anchor=(0.5,1.1), ncol=int(math.ceil(len(xss)/2.0)), fancybox=True)
+
+    ax.grid(True)
+
+    fig.savefig(filename, dpi=100)
+    plt.close(fig)
+
+
+
+def curves(xss, yss, filename, yss_min = [], yss_max = [], labels = [], invert_x = False, xlabel = None, ylabel = None, xlog = False):
     fig, ax = plt.subplots(1, 1)
 
-    ax.set_xscale('log', basex=2)
+    if xlog:
+        ax.set_xscale('log', basex=xlog)
 
     if invert_x:
         ax.invert_xaxis()
 
-    for ys, c, label in zip(yss, plt.cm.Set1(np.linspace(0, 1, len(yss))), labels):
+    if len(labels) < len(xss):
+        labels += [''] * (len(xss) - len(labels))
+
+    if len(yss_min) < len(yss):
+        labels += [None] * (len(yss) - len(yss_min))
+
+    if len(yss_max) < len(yss):
+        labels += [None] * (len(yss) - len(yss_max))
+
+    for xs, ys, ys_min, ys_max, c, label in zip(
+            xss,
+            yss,
+            yss_min,
+            yss_max,
+            plt.cm.Dark2(np.linspace(0, 1, len(yss))),
+            labels):
+
+        print "xs=", xs
+        print "ys=", ys
         ax.plot(xs, ys, '-', c = c, label = label)
+
+        if yss_min is not None and yss_max is not None:
+            ax.fill_between(xs, ys_min, ys_max, color = c, alpha = 0.1)
 
     if xlabel:
         ax.set_xlabel(xlabel)
@@ -98,7 +161,7 @@ def curves(xs, yss, filename, labels = [], invert_x = False, xlabel = None, ylab
         ax.set_ylabel(ylabel)
 
     ax.legend(loc='upper center', prop={'size': 8}, bbox_to_anchor=(0.5, 1.1), ncol=2, fancybox=True)
-    fig.savefig(filename)
+    fig.savefig(filename, bbox_inches='tight')
     plt.close(fig)
 
 
@@ -135,7 +198,7 @@ def cdfs(a, filename):
         plt.axvline(x = median, color=c, linestyle='--', linewidth=i/5+1) 
 
     plt.legend(loc='best', prop={'size': 8})
-    plt.savefig(filename, dpi=100)
+    plt.savefig(filename, dpi=100, bbox_inches='tight')
 
 def boxplots(xs, yss, filename):
     plt.clf()
@@ -147,9 +210,9 @@ def boxplots(xs, yss, filename):
     
     plt.autoscale()
 
-    plt.savefig(filename, dpi=100)
+    plt.savefig(filename, dpi=100, bbox_inches='tight')
 
-def multi_boxplots(xs, ysss, filename, ylim = (-0.05, 1.05), labels = [], toplabels = []):
+def multi_boxplots(xs, ysss, filename, ylim = (-0.05, 1.05), labels = [], toplabels = [], points = True, xlabel = '', ylabel = ''):
     """
     ysss = [
             [ [ x x x x ], ... ],
@@ -203,16 +266,25 @@ def multi_boxplots(xs, ysss, filename, ylim = (-0.05, 1.05), labels = [], toplab
                 plt.setp(e, color = c)
 
         # dummy line for legend
-        h, = plt.plot([1, 1], 'r-', c = c, color = c, linestyle='-')
+        h, = plt.plot([1, 1], c = c, color = c, linestyle='-')
         dummylines.append(h)
+
+
+        for ys, p in zip(yss, ps):
+            rxs = np.random.normal(p, 0.06, size = len(ys))
+            plt.plot(rxs, ys, '.', c = c, alpha = 0.5)
+
 
         if tlables:
             for p, label in zip(ps, tlables):
                 axes.text(p, top * 0.95, label, horizontalalignment='center', size=12, weight='bold', color = c)
 
     axes.yaxis.grid(True)
+    axes.set_xlabel(xlabel)
+    axes.set_ylabel(ylabel)
 
-    plt.legend(dummylines, labels, loc='upper center', prop={'size': 8}, bbox_to_anchor=(0.5,1.1), ncol=3, fancybox=True)
+
+    plt.legend(dummylines, labels, loc='upper center', prop={'size': 10}, bbox_to_anchor=(0.5,1.1), ncol=int(math.ceil(len(dummylines)/2.0)), fancybox=True)
     for l in dummylines:
         l.set_visible(False)
 
@@ -220,7 +292,8 @@ def multi_boxplots(xs, ysss, filename, ylim = (-0.05, 1.05), labels = [], toplab
     axes.set_xlim((0, maxlen * k))
     ylim = (ylim[0], top)
     axes.set_ylim(ylim)
-    fig.savefig(filename, dpi=100)
+
+    fig.savefig(filename, dpi=100, bbox_inches = 'tight')
     plt.close(fig)
 
 
@@ -233,7 +306,7 @@ def matrix(a, filename):
     fig, ax = plt.subplots(dpi=100)
     cs = ax.matshow(a)
     fig.colorbar(cs)
-    fig.savefig(filename, dpi=100)
+    fig.savefig(filename, dpi=100, bbox_inches = 'tight')
     plt.close(fig)
 
 
@@ -270,7 +343,7 @@ def kde1d(xs_plot, estimators, filename, xss_data = [], labels = None,
         ax.axvline(c = 'grey', linestyle = '-', x = line)
 
     ax.grid(grid)
-    fig.savefig(filename, dpi=100)
+    fig.savefig(filename, dpi=100, bbox_inches='tight')
 
     plt.close(fig)
 
