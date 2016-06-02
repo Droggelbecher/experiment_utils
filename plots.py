@@ -12,6 +12,82 @@ import matplotlib.transforms as mtrans
 from matplotlib import rc
 rc('text', usetex=True)
 
+def fill_between_steps(ax, x, y1, y2=0, step_where='pre', **kwargs):
+    ''' fill between a step plot and 
+
+    source: https://github.com/matplotlib/matplotlib/issues/643/
+
+    Parameters
+    ----------
+    ax : Axes
+       The axes to draw to
+
+    x : array-like
+        Array/vector of index values.
+
+    y1 : array-like or float
+        Array/vector of values to be filled under.
+    y2 : array-Like or float, optional
+        Array/vector or bottom values for filled area. Default is 0.
+
+    step_where : {'pre', 'post', 'mid'}
+        where the step happens, same meanings as for `step`
+
+    **kwargs will be passed to the matplotlib fill_between() function.
+
+    Returns
+    -------
+    ret : PolyCollection
+       The added artist
+
+    '''
+    if step_where not in {'pre', 'post', 'mid'}:
+        raise ValueError("where must be one of {{'pre', 'post', 'mid'}} "
+                         "You passed in {wh}".format(wh=step_where))
+
+    # make sure y values are up-converted to arrays 
+    if np.isscalar(y1):
+        y1 = np.ones_like(x) * y1
+
+    if np.isscalar(y2):
+        y2 = np.ones_like(x) * y2
+
+    # temporary array for up-converting the values to step corners
+    # 3 x 2N - 1 array 
+
+    vertices = np.vstack((x, y1, y2))
+
+    # this logic is lifted from lines.py
+    # this should probably be centralized someplace
+    if step_where == 'pre':
+        steps = np.zeros((3, 2 * len(x) - 1), np.float)
+        steps[0, 0::2], steps[0, 1::2] = vertices[0, :], vertices[0, :-1]
+        steps[1:, 0::2], steps[1:, 1:-1:2] = vertices[1:, :], vertices[1:, 1:]
+
+    elif step_where == 'post':
+        steps = np.zeros((3, 2 * len(x) - 1), np.float)
+        steps[0, ::2], steps[0, 1:-1:2] = vertices[0, :], vertices[0, 1:]
+        steps[1:, 0::2], steps[1:, 1::2] = vertices[1:, :], vertices[1:, :-1]
+
+    elif step_where == 'mid':
+        steps = np.zeros((3, 2 * len(x)), np.float)
+        steps[0, 1:-1:2] = 0.5 * (vertices[0, :-1] + vertices[0, 1:])
+        steps[0, 2::2] = 0.5 * (vertices[0, :-1] + vertices[0, 1:])
+        steps[0, 0] = vertices[0, 0]
+        steps[0, -1] = vertices[0, -1]
+        steps[1:, 0::2], steps[1:, 1::2] = vertices[1:, :], vertices[1:, :]
+    else:
+        raise RuntimeError("should never hit end of if-elif block for validated input")
+
+    # un-pack
+    xx, yy1, yy2 = steps
+
+    # now to the plotting part:
+    return ax.fill_between(xx, yy1, y2=yy2, **kwargs)
+
+
+
+
 def all_relations(a, filename, labels = None):
     """
     a: np array, rows for data, columns for features/axes
@@ -121,7 +197,16 @@ def relations(xss, yss, filename, xlabel=None, ylabel=None, pointlabels = [],
 
 
 
-def curves(xss, yss, filename, yss_min = [], yss_max = [], labels = [], invert_x = False, xlabel = None, ylabel = None, xlog = False):
+def curves(xss, yss, filename,
+        yss_min = [], yss_max = [],
+        labels = [],
+        invert_x = False,
+        xlabel = None, ylabel = None,
+        xoffsets = None,
+        xlog = False,
+        xlim = None,
+        step = False
+        ):
     fig, ax = plt.subplots(1, 1)
 
     if xlog:
@@ -139,6 +224,10 @@ def curves(xss, yss, filename, yss_min = [], yss_max = [], labels = [], invert_x
     if len(yss_max) < len(yss):
         labels += [None] * (len(yss) - len(yss_max))
 
+    if xoffsets is None:
+        xoffsets = 0
+
+    offs = None 
     for xs, ys, ys_min, ys_max, c, label in zip(
             xss,
             yss,
@@ -147,12 +236,25 @@ def curves(xss, yss, filename, yss_min = [], yss_max = [], labels = [], invert_x
             plt.cm.Dark2(np.linspace(0, 1, len(yss))),
             labels):
 
-        print "xs=", xs
-        print "ys=", ys
-        ax.plot(xs, ys, '-', c = c, label = label)
+        if type(xoffsets) in (int, float):
+            xoffsets = [xoffsets] * len(xs)
+        if offs is None:
+            offs = np.zeros(len(xs))
+
+        if step:
+            ax.step(xs + offs, ys, '-', where = 'post', c = c, label = label)
+
+        else:
+            ax.plot(xs + offs, ys, '-', c = c, label = label)
 
         if yss_min is not None and yss_max is not None:
-            ax.fill_between(xs, ys_min, ys_max, color = c, alpha = 0.1)
+            if step:
+                fill_between_steps(ax, xs + offs, ys_min, ys_max, color = c, alpha = 0.1, linestyle = '--', step_where = 'post')
+
+            else:
+                ax.fill_between(xs + offs, ys_min, ys_max, color = c, alpha = 0.1)
+
+        offs += xoffsets
 
     if xlabel:
         ax.set_xlabel(xlabel)
@@ -160,10 +262,28 @@ def curves(xss, yss, filename, yss_min = [], yss_max = [], labels = [], invert_x
     if ylabel:
         ax.set_ylabel(ylabel)
 
-    ax.legend(loc='upper center', prop={'size': 8}, bbox_to_anchor=(0.5, 1.1), ncol=2, fancybox=True)
+    if xlim is not None:
+        ax.set_xlim(xlim)
+
+    ax.legend(loc='upper center', prop={'size': 8}, bbox_to_anchor=(0.5, 1.1), ncol=int(math.ceil(len(yss) / 2.0)), fancybox=True)
     fig.savefig(filename, bbox_inches='tight')
     plt.close(fig)
 
+
+def percentile_curves(xss, ysss, filename, low = 10, high = 90, **kws):
+
+    yss = [ np.array([np.median(s[i:]) for i in range(len(s))]) for s in ysss ]
+    yss_min = [ np.array([np.percentile(s[i:], q = low) for i in range(len(s))]) for s in ysss ]
+    yss_max = [ np.array([np.percentile(s[i:], q = high) for i in range(len(s))]) for s in ysss ]
+
+    curves(
+            xss = xss,
+            yss = yss,
+            filename = filename,
+            yss_min = yss_min,
+            yss_max = yss_max,
+            **kws
+            )
 
 
 
