@@ -50,7 +50,10 @@ class DictDB:
 
 
         z = []
-        ks = [order_by] + list(set(keys) - set([order_by]))
+        if order_by is None:
+            ks = list(keys)
+        else:
+            ks = [order_by] + list(set(keys) - set([order_by]))
         for k in ks:
             z.append(rs[k])
         z = zip(*sorted(zip(*z)))

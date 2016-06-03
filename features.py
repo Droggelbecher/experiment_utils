@@ -1,4 +1,5 @@
 
+import sys
 import numpy as np
 import metrics
 
@@ -39,7 +40,7 @@ class Features:
             d += f.distance(f(a), f(b)) * w
         return d
 
-    def assemble(self, **kws):
+    def assemble(self, names = [], a = [], **kws):
         """
         kws: feature name => value (=ndarray of correct size).
             '_rest' will be used to fill up all non-addressed feature columns
@@ -47,25 +48,40 @@ class Features:
         return: ndarray of full row length with inserted features
         """
         r = np.zeros(self._len)
+
         idx = 0
         rest_idx = 0
-        rest = np.zeros(self._len)
-        if '_rest' in kws and kws['_rest'] is not None:
-            rest = kws['_rest']
 
-        while idx < self._len:
-            for k, v in kws.items():
-                if k == '_rest': continue
-                f = getattr(self, k)
-                if f.start == idx:
-                    if v is not None:
-                        r[f.start:f.end] = v
-                    idx = f.end + 1
-                    break
-            else:
-                r[idx] = rest[rest_idx]
-                idx += 1
-                rest_idx += 1
+        a_idx = 0
+
+        if len(names):
+            assert not kws
+
+            # Fill in features from array a
+            for f in self.get_features(names):
+                r[f.start:f.end] = a[a_idx:a_idx + len(f)]
+                a_idx += len(f)
+
+
+        else:
+            # Fill in features from keywords
+            rest = np.zeros(self._len)
+            if '_rest' in kws and kws['_rest'] is not None:
+                rest = kws['_rest']
+
+            while idx < self._len:
+                for k, v in kws.items():
+                    if k == '_rest': continue
+                    f = getattr(self, k)
+                    if f.start == idx:
+                        if v is not None:
+                            r[f.start:f.end] = v
+                        idx = f.end + 1
+                        break
+                else:
+                    r[idx] = rest[rest_idx]
+                    idx += 1
+                    rest_idx += 1
 
         return r
 

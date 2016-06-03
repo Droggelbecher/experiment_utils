@@ -112,7 +112,9 @@ def generate_gmaps(
         circles = [],
         center = (52.495372, 13.461614),
         info = [],
-        default_color = '#000000'
+        default_color = '#000000',
+        legend = True,
+        size = (1000, 800),
         ):
 
     lines = list(lines)
@@ -246,7 +248,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
 </head>
 
 <body>
-<div id="googleMap" style="width:1000px;height:800px;"></div>
+<div id="googleMap" style="width:{}px;height:{}px;"></div>
 
 <table border="0">
 <tr>{}</tr>
@@ -261,8 +263,9 @@ google.maps.event.addDomListener(window, 'load', initialize);
         s_lines, s_markers,
         ',\n'.join('{{location: new google.maps.LatLng({}, {}), weight: {:.8f} }}'.format(lat, lon, float(w)) for (lat, lon, w) in heatmap),
         ','.join('new google.maps.Circle({})'.format(json.dumps(c)) for c in circles),
+        size[0], size[1],
 
-        ''.join('<td style="background-color: {};">{}</td>'.format(c, i) for i, c in enumerate(colors)),
+        ''.join('<td style="background-color: {};">{}</td>'.format(c, i) for i, c in enumerate(colors)) if legend else '',
         '<br />\n'.join(info)
         )
 

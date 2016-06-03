@@ -2,6 +2,8 @@
 
 import numpy as np
 import math
+import logging
+import re
 
 #import matplotlib
 #matplotlib.use('TkAgg')
@@ -205,69 +207,88 @@ def curves(xss, yss, filename,
         xoffsets = None,
         xlog = False,
         xlim = None,
-        step = False
+        step = False,
+        closeups_x = []
         ):
-    fig, ax = plt.subplots(1, 1)
 
-    if xlog:
-        ax.set_xscale('log', basex=xlog)
+    xlim_ = xlim
+    filename_ = filename
 
-    if invert_x:
-        ax.invert_xaxis()
+    for i, xlim in enumerate([xlim_] + closeups_x):
+        fig, ax = plt.subplots(1, 1)
 
-    if len(labels) < len(xss):
-        labels += [''] * (len(xss) - len(labels))
-
-    if len(yss_min) < len(yss):
-        labels += [None] * (len(yss) - len(yss_min))
-
-    if len(yss_max) < len(yss):
-        labels += [None] * (len(yss) - len(yss_max))
-
-    if xoffsets is None:
-        xoffsets = 0
-
-    offs = None 
-    for xs, ys, ys_min, ys_max, c, label in zip(
-            xss,
-            yss,
-            yss_min,
-            yss_max,
-            plt.cm.Dark2(np.linspace(0, 1, len(yss))),
-            labels):
-
-        if type(xoffsets) in (int, float):
-            xoffsets = [xoffsets] * len(xs)
-        if offs is None:
-            offs = np.zeros(len(xs))
-
-        if step:
-            ax.step(xs + offs, ys, '-', where = 'post', c = c, label = label)
-
+        if i == 0:
+            filename = filename_
         else:
-            ax.plot(xs + offs, ys, '-', c = c, label = label)
+            m = re.match(r'(.*)(\.[^.]*)$', filename_)
+            if m is None:
+                filename + filename_ + '_closeup{}'.format(i) + '.pdf'
+            else:
+                filename = m.groups()[0] + '_closeup{}'.format(i) + m.groups()[1]
 
-        if yss_min is not None and yss_max is not None:
+
+
+        if xlog:
+            ax.set_xscale('log', basex=xlog)
+
+        if invert_x:
+            ax.invert_xaxis()
+
+        if len(labels) < len(xss):
+            labels += [''] * (len(xss) - len(labels))
+
+        if len(yss_min) < len(yss):
+            labels += [None] * (len(yss) - len(yss_min))
+
+        if len(yss_max) < len(yss):
+            labels += [None] * (len(yss) - len(yss_max))
+
+        if xoffsets is None:
+            xoffsets = 0
+
+        offs = None 
+        for xs, ys, ys_min, ys_max, c, label in zip(
+                xss,
+                yss,
+                yss_min,
+                yss_max,
+                plt.cm.Dark2(np.linspace(0, 1, len(yss))),
+                labels):
+
+            if type(xoffsets) in (int, float):
+                xoffsets = [xoffsets] * len(xs)
+            if offs is None:
+                offs = np.zeros(len(xs))
+
             if step:
-                fill_between_steps(ax, xs + offs, ys_min, ys_max, color = c, alpha = 0.1, linestyle = '--', step_where = 'post')
+                ax.step(xs + offs, ys, '-', where = 'post', c = c, label = label)
 
             else:
-                ax.fill_between(xs + offs, ys_min, ys_max, color = c, alpha = 0.1)
+                ax.plot(xs + offs, ys, '-', c = c, label = label)
 
-        offs += xoffsets
+            if yss_min is not None and yss_max is not None:
+                if step:
+                    fill_between_steps(ax, xs + offs, ys_min, ys_max, color = c, alpha = 0.1, linestyle = '--', step_where = 'post')
 
-    if xlabel:
-        ax.set_xlabel(xlabel)
+                else:
+                    ax.fill_between(xs + offs, ys_min, ys_max, color = c, alpha = 0.1)
 
-    if ylabel:
-        ax.set_ylabel(ylabel)
+            offs += xoffsets
 
-    if xlim is not None:
-        ax.set_xlim(xlim)
+        if xlabel:
+            ax.set_xlabel(xlabel)
 
-    ax.legend(loc='upper center', prop={'size': 8}, bbox_to_anchor=(0.5, 1.1), ncol=int(math.ceil(len(yss) / 2.0)), fancybox=True)
-    fig.savefig(filename, bbox_inches='tight')
-    plt.close(fig)
+        if ylabel:
+            ax.set_ylabel(ylabel)
+
+        if xlim is not None:
+            ax.set_xlim(xlim)
+
+        ax.legend(loc='upper center', prop={'size': 8}, bbox_to_anchor=(0.5, 1.1), ncol=int(math.ceil(len(yss) / 2.0)), fancybox=True)
+        logging.debug('creating {}'.format(filename))
+        fig.savefig(filename, bbox_inches='tight')
+        plt.close(fig)
+
 
 
 def percentile_curves(xss, ysss, filename, low = 10, high = 90, **kws):
