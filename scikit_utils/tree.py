@@ -1,11 +1,62 @@
 #!/usr/bin/env python
 
+from collections import Counter
 from sklearn.tree import _tree
 from sklearn.externals import six
+import itertools
+
+def leaf_iter(tree, feature_names=None, class_names=None):
+
+    node_id = 0
+
+    def recurse(node_id, path=[]):
+        left_child = tree.children_left[node_id]
+        right_child = tree.children_right[node_id]
+
+        #print("recurse({}, {}) -> l={} r={}".format(node_id, path, left_child, right_child))
+
+        if feature_names is not None:
+            feature = feature_names[tree.feature[node_id]]
+        else:
+            feature = "X[%s]" % tree.feature[node_id]
+
+        path = path + [(feature, tree.threshold[node_id])]
+
+        if left_child == _tree.TREE_LEAF:
+            yield path
+        else:
+            for x in itertools.chain(recurse(left_child, path), recurse(right_child, path)):
+                yield x
+
+
+    return recurse(node_id, [])
+
+
+
+def analyze_tree(decision_tree, feature_names=None, class_names=None):
+
+    # for each path determine the feature with the maximum number of mentions
+
+    max_path = []
+    max_path_count = 0
+    max_path_elem = ''
+
+    for path in leaf_iter(decision_tree, feature_names, class_names):
+        featcount = Counter()
+        for feat, val in path:
+            featcount[feat] += 1
+        elem, count = featcount.most_common(1)[0]
+        if count > max_path_count:
+            max_path = path
+            max_path_count = count
+            max_path_elem = elem
+
+    print("most suspect path: {}\nwith {}x'{}' ".format(str(max_path), max_path_count, max_path_elem))
+
 
 
 def export_graphviz(decision_tree, out_file="tree.dot", feature_names=None,
-                    max_depth=None, class_names=None, rankdir='LR'):
+                    max_depth=None, class_names=None, rankdir='LR', highlight_path=None):
     """Export a decision tree in DOT format.
 
     This function generates a GraphViz representation of the decision tree,
@@ -46,10 +97,13 @@ def export_graphviz(decision_tree, out_file="tree.dot", feature_names=None,
     ...     out_file='tree.dot')                # doctest: +SKIP
     """
 
+    if class_names is None:
+        class_names = [str(x) for x in range(len(decision_tree.classes_))]
+
     def pretty_samples(samples):
         s = ''
         if class_names is not None:
-            print(type(samples), samples)
+            #print(type(samples), samples)
             for i, n in enumerate(samples):
                 if n != 0:
                     s += '%s(%d) ' % (class_names[decision_tree.classes_[i]], int(n))
@@ -70,7 +124,7 @@ def export_graphviz(decision_tree, out_file="tree.dot", feature_names=None,
         value = pretty_samples(value)
 
         if tree.children_left[node_id] == _tree.TREE_LEAF:
-            return "%s = %.4f\\nsamples = %s\\nvalue = %s" \
+            return "%s = %.4f\\nsamples = %s\\n%s" \
                    % (criterion,
                       tree.impurity[node_id],
                       tree.n_node_samples[node_id],
@@ -81,14 +135,20 @@ def export_graphviz(decision_tree, out_file="tree.dot", feature_names=None,
             else:
                 feature = "X[%s]" % tree.feature[node_id]
 
-            return "%s <= %.4f\\n%s = %s\\nsamples = %s" \
+            #return "%s <= %.4f\\n%s = %s\\nsamples = %s" \
+                   #% (feature,
+                      #tree.threshold[node_id],
+                      #criterion,
+                      #tree.impurity[node_id],
+                      #tree.n_node_samples[node_id])
+            return "%s <= %.4f\\nsamples = %s" \
                    % (feature,
                       tree.threshold[node_id],
-                      criterion,
-                      tree.impurity[node_id],
                       tree.n_node_samples[node_id])
 
-    def recurse(tree, node_id, criterion, parent=None, depth=0):
+    highlighted_nodes = set([0])
+
+    def recurse(tree, node_id, criterion, parent=None, depth=0, left=False):
         if node_id == _tree.TREE_LEAF:
             raise ValueError("Invalid node_id %s" % _tree.TREE_LEAF)
 
@@ -97,18 +157,50 @@ def export_graphviz(decision_tree, out_file="tree.dot", feature_names=None,
 
         # Add node with description
         if max_depth is None or depth <= max_depth:
-            out_file.write('%d [label="%s", shape="box"] ;\n' %
-                           (node_id, node_to_str(tree, node_id, criterion)))
+            is_leaf = (left_child == _tree.TREE_LEAF)
+
+            fillcolor = '#ffffff'
+            penwidth = 1
+
+            if is_leaf:
+                penwidth = 3
+
+            i = tree.impurity[node_id]
+            fillcolor = '#{:02x}{:02x}00'.format(
+                    int(255 * min(1.0, 2.0 * i)),
+                    int(255 * min(1.0, 2.0 - 2.0 * i))
+                    )
+
+            out_file.write('%d [label="%s", shape="box", style="filled", fillcolor="%s", penwidth=%d] ;\n' %
+                           (node_id, node_to_str(tree, node_id, criterion), fillcolor, penwidth))
 
             if parent is not None:
-                # Add edge to parent
-                out_file.write('%d -> %d ;\n' % (parent, node_id))
 
-            if left_child != _tree.TREE_LEAF:
-                recurse(tree, left_child, criterion=criterion, parent=node_id,
+                path_taken = False
+                if highlight_path is not None and parent in highlighted_nodes:
+                    v = highlight_path[tree.feature[parent]]
+                    pivot = tree.threshold[parent]
+
+                    path_taken = (left and (v <= pivot)) or (not left and v > pivot)
+                    if path_taken:
+                        highlighted_nodes.add(node_id)
+
+                # Add edge to parent
+                if left:
+                    out_file.write('%d -> %d [label="<=",penwidth=%d];\n' % (parent, node_id, 5 if path_taken else 1))
+                else:
+                    out_file.write('%d -> %d [label=">",penwidth=%d];\n' % (parent, node_id, 5 if path_taken else 1))
+
+                return node_id
+
+            if not is_leaf:
+                l = recurse(tree, left_child, criterion=criterion, parent=node_id,
+                        depth=depth + 1, left=True)
+                r = recurse(tree, right_child, criterion=criterion, parent=node_id,
                         depth=depth + 1)
-                recurse(tree, right_child, criterion=criterion, parent=node_id,
-                        depth=depth + 1)
+
+                if l is None: return r
+                return l
 
         else:
             out_file.write('%d [label="(...)", shape="box"] ;\n' % node_id)
