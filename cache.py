@@ -116,6 +116,7 @@ def _get_from_cache(cache_path, f, kws, ignore_kws, filenames):
         # A matching cache file exists!
         # Now find out whether it is up-to-date
         cache_file = open(cache_path, 'rb')
+        logging.debug("cache file: {}".format(cache_path))
         cache_data = pickle.load(cache_file)
 
         if not _verify_cache(cache_data, f, kws, ignore_kws):
