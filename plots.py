@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import sys
 import numpy as np
 import math
 import logging
@@ -199,17 +200,19 @@ def relations(xss, yss, filename, xlabel=None, ylabel=None, pointlabels = [],
 
 
 
-def curves(xss, yss, filename,
-        yss_min = [], yss_max = [],
-        labels = [],
-        invert_x = False,
-        xlabel = None, ylabel = None,
-        xoffsets = None,
-        xlog = False,
-        xlim = None,
-        step = False,
-        closeups_x = []
-        ):
+def curves(xss, yss,
+           filename,
+           yss_min = [], yss_max = [],
+           labels = [],
+           invert_x = False,
+           xlabel = None, ylabel = None,
+           xoffsets = None,
+           xlog = False, ylog = False,
+           xlim = None, ylim = None,
+           step = False,
+           closeups_x = [],
+           linestyle = '-',
+          ):
 
     xlim_ = xlim
     filename_ = filename
@@ -231,6 +234,9 @@ def curves(xss, yss, filename,
         if xlog:
             ax.set_xscale('log', basex=xlog)
 
+        if ylog:
+            ax.set_yscale('log', basex=ylog)
+
         if invert_x:
             ax.invert_xaxis()
 
@@ -238,10 +244,10 @@ def curves(xss, yss, filename,
             labels += [''] * (len(xss) - len(labels))
 
         if len(yss_min) < len(yss):
-            labels += [None] * (len(yss) - len(yss_min))
+            yss_min += [None] * (len(yss) - len(yss_min))
 
         if len(yss_max) < len(yss):
-            labels += [None] * (len(yss) - len(yss_max))
+            yss_max += [None] * (len(yss) - len(yss_max))
 
         if xoffsets is None:
             xoffsets = 0
@@ -261,12 +267,12 @@ def curves(xss, yss, filename,
                 offs = np.zeros(len(xs))
 
             if step:
-                ax.step(xs + offs, ys, '-', where = 'post', c = c, label = label)
+                ax.step(xs + offs, ys, linestyle, where = 'post', c = c, label = label)
 
             else:
-                ax.plot(xs + offs, ys, '-', c = c, label = label)
+                ax.plot(xs + offs, ys, linestyle, c = c, label = label)
 
-            if yss_min is not None and yss_max is not None:
+            if ys_min is not None and ys_max is not None:
                 if step:
                     fill_between_steps(ax, xs + offs, ys_min, ys_max, color = c, alpha = 0.1, linestyle = '--', step_where = 'post')
 
@@ -282,6 +288,9 @@ def curves(xss, yss, filename,
             ax.set_ylabel(ylabel)
 
         if xlim is not None:
+            ax.set_xlim(xlim)
+
+        if ylim is not None:
             ax.set_xlim(xlim)
 
         ax.legend(loc='upper center', prop={'size': 8}, bbox_to_anchor=(0.5, 1.1), ncol=int(math.ceil(len(yss) / 2.0)), fancybox=True)
