@@ -23,7 +23,7 @@ def leaf_iter(tree, feature_names=None, class_names=None):
         path = path + [(feature, tree.threshold[node_id])]
 
         if left_child == _tree.TREE_LEAF:
-            yield path
+            yield path[:-1]
         else:
             for x in itertools.chain(recurse(left_child, path), recurse(right_child, path)):
                 yield x
@@ -190,8 +190,6 @@ def export_graphviz(decision_tree, out_file="tree.dot", feature_names=None,
                     out_file.write('%d -> %d [label="<=",penwidth=%d];\n' % (parent, node_id, 5 if path_taken else 1))
                 else:
                     out_file.write('%d -> %d [label=">",penwidth=%d];\n' % (parent, node_id, 5 if path_taken else 1))
-
-                return node_id
 
             if not is_leaf:
                 l = recurse(tree, left_child, criterion=criterion, parent=node_id,
