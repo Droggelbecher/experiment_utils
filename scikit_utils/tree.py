@@ -5,25 +5,46 @@ from sklearn.tree import _tree
 from sklearn.externals import six
 import itertools
 
-def leaf_iter(tree, feature_names=None, class_names=None):
+
+
+def leaf_iter(tree, feature_names=None, class_names=None, report = 'ft', include_leaf = False):
+    """
+    report:
+        f -> feature
+        t -> threshold
+        i -> id
+    """
 
     node_id = 0
 
     def recurse(node_id, path=[]):
+        assert node_id < len(tree.children_left)
+        assert node_id < len(tree.children_right)
         left_child = tree.children_left[node_id]
         right_child = tree.children_right[node_id]
-
-        #print("recurse({}, {}) -> l={} r={}".format(node_id, path, left_child, right_child))
 
         if feature_names is not None:
             feature = feature_names[tree.feature[node_id]]
         else:
             feature = "X[%s]" % tree.feature[node_id]
 
-        path = path + [(feature, tree.threshold[node_id])]
+
+        v = []
+        for c in report:
+            v.append({
+                'i': node_id,
+                't': tree.threshold[node_id],
+                'f': feature
+            }[c])
+
+        path.append(tuple(v))
+        #path = path + [(feature, tree.threshold[node_id])]
 
         if left_child == _tree.TREE_LEAF:
-            yield path[:-1]
+            if include_leaf:
+                yield path
+            else:
+                yield path[:-1]
         else:
             for x in itertools.chain(recurse(left_child, path), recurse(right_child, path)):
                 yield x
@@ -34,7 +55,6 @@ def leaf_iter(tree, feature_names=None, class_names=None):
 
 
 def analyze_tree(decision_tree, feature_names=None, class_names=None):
-
     # for each path determine the feature with the maximum number of mentions
 
     max_path = []
@@ -53,6 +73,61 @@ def analyze_tree(decision_tree, feature_names=None, class_names=None):
 
     print("most suspect path: {}\nwith {}x'{}' ".format(str(max_path), max_path_count, max_path_elem))
 
+
+def make_subtree(tree, leaf_ids):
+
+    class SubTreeWrapper:
+        def __init__(self, tree, leaf_ids):
+            self.classes_ = tree.classes_
+            self.criterion = tree.criterion
+
+            tree = tree.tree_
+            self.tree_ = self
+
+            leaf_ids = set(leaf_ids)
+            inner_ids = set()
+            print 'leaf_ids=', leaf_ids
+            for path in leaf_iter(tree, report='i', include_leaf=True):
+                if path[-1][0] in leaf_ids:
+                    inner_ids.update(x[0] for x in path[:-1])
+
+            ids = sorted(leaf_ids.union(inner_ids))
+
+            max_id = max(
+                np.max(tree.children_left),
+                np.max(tree.children_right)
+            )
+
+            print 'ids=', ids
+
+            index_transform = np.full(tree.node_count + 1, -2, dtype=np.int)
+            for i, id_ in enumerate(ids):
+                index_transform[id_] = i
+
+            # trick to keep -1 (special value for marking leaves) unmapped
+            index_transform[-1] = -1
+
+            print 'index_transform', index_transform
+
+            mask = np.zeros(len(index_transform) - 1, dtype=np.bool)
+            mask[index_transform[:-1] != -2] = True
+
+            print 'mask', mask
+
+            self.children_left = index_transform[ tree.children_left[mask] ]
+
+            print tree.children_left
+            print self.children_left
+
+            self.children_right = index_transform[ tree.children_right[mask] ]
+            self.feature = tree.feature[mask]
+            self.threshold = tree.threshold[mask]
+            self.value = tree.value[mask]
+            self.impurity = tree.impurity[mask]
+            self.n_outputs = tree.n_outputs
+            self.n_node_samples = tree.n_node_samples
+
+    return SubTreeWrapper(tree, leaf_ids)
 
 
 def export_graphviz(decision_tree, out_file="tree.dot", feature_names=None,
@@ -98,12 +173,12 @@ def export_graphviz(decision_tree, out_file="tree.dot", feature_names=None,
     """
 
     if class_names is None:
-        class_names = [str(x) for x in range(len(decision_tree.classes_))]
+        class_names = { k: str(k) for k in decision_tree.classes_ }
+        #class_names = [str(x) for x in range(len(decision_tree.classes_))]
 
     def pretty_samples(samples):
         s = ''
         if class_names is not None:
-            #print(type(samples), samples)
             for i, n in enumerate(samples):
                 if n != 0:
                     s += '%s(%d) ' % (class_names[decision_tree.classes_[i]], int(n))
@@ -141,6 +216,11 @@ def export_graphviz(decision_tree, out_file="tree.dot", feature_names=None,
                       #criterion,
                       #tree.impurity[node_id],
                       #tree.n_node_samples[node_id])
+            #print 'feature', feature, 'node_id', node_id
+            #print "%s <= %.4f\\nsamples = %s" \
+                   #% (feature,
+                      #tree.threshold[node_id],
+                      #tree.n_node_samples[node_id])
             return "%s <= %.4f\\nsamples = %s" \
                    % (feature,
                       tree.threshold[node_id],
@@ -149,8 +229,15 @@ def export_graphviz(decision_tree, out_file="tree.dot", feature_names=None,
     highlighted_nodes = set([0])
 
     def recurse(tree, node_id, criterion, parent=None, depth=0, left=False):
+
+        print '{}recurse({}, parent={}, depth={}, left={})'.format(
+            ' ' * depth, node_id, parent, depth, left)
+
         if node_id == _tree.TREE_LEAF:
             raise ValueError("Invalid node_id %s" % _tree.TREE_LEAF)
+
+        if node_id == -2:
+            return -2
 
         left_child = tree.children_left[node_id]
         right_child = tree.children_right[node_id]
@@ -170,6 +257,8 @@ def export_graphviz(decision_tree, out_file="tree.dot", feature_names=None,
                     int(255 * min(1.0, 2.0 * i)),
                     int(255 * min(1.0, 2.0 - 2.0 * i))
                     )
+
+            #print 'node_id', node_id
 
             out_file.write('%d [label="%s", shape="box", style="filled", fillcolor="%s", penwidth=%d] ;\n' %
                            (node_id, node_to_str(tree, node_id, criterion), fillcolor, penwidth))
@@ -228,4 +317,27 @@ def export_graphviz(decision_tree, out_file="tree.dot", feature_names=None,
     finally:
         if own_file:
             out_file.close()
+
+
+if __name__ == '__main__':
+    from sklearn.tree import DecisionTreeClassifier
+    import numpy as np
+
+    X = np.random.randint(0, 100, size=(100, 10))
+    y = np.random.randint(0, 100, size=(100,))
+
+    classifier = DecisionTreeClassifier(min_samples_leaf = 8)
+    classifier.fit(X, y)
+
+    export_graphviz(classifier, out_file='full.dot')
+
+    subtree = make_subtree(classifier, np.random.randint(0, classifier.tree_.node_count, size=(3,)))
+
+    export_graphviz(subtree, out_file='subtree.dot')
+
+
+    #def export_graphviz(decision_tree, out_file="tree.dot", feature_names=None,
+                        #max_depth=None, class_names=None, rankdir='LR', highlight_path=None):
+    
+
 
