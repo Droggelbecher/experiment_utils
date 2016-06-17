@@ -14,6 +14,7 @@ import matplotlib.transforms as mtrans
 
 from matplotlib import rc
 rc('text', usetex=True)
+rc('font', family='serif')
 
 def fill_between_steps(ax, x, y1, y2=0, step_where='pre', **kwargs):
     ''' fill between a step plot and 
@@ -235,7 +236,7 @@ def curves(xss, yss,
             ax.set_xscale('log', basex=xlog)
 
         if ylog:
-            ax.set_yscale('log', basex=ylog)
+            ax.set_yscale('log', basey=ylog)
 
         if invert_x:
             ax.invert_xaxis()
@@ -291,7 +292,7 @@ def curves(xss, yss,
             ax.set_xlim(xlim)
 
         if ylim is not None:
-            ax.set_xlim(xlim)
+            ax.set_ylim(ylim)
 
         ax.legend(loc='upper center', prop={'size': 8}, bbox_to_anchor=(0.5, 1.1), ncol=int(math.ceil(len(yss) / 2.0)), fancybox=True)
         logging.debug('creating {}'.format(filename))
