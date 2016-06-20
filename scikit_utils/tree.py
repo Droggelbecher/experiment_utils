@@ -109,7 +109,7 @@ def make_subtree(tree, leaf_ids):
             self.value = tree.value[mask]
             self.impurity = tree.impurity[mask]
             self.n_outputs = tree.n_outputs
-            self.n_node_samples = tree.n_node_samples
+            self.n_node_samples = tree.n_node_samples[mask]
 
     return SubTreeWrapper(tree, leaf_ids)
 
