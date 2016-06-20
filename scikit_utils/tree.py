@@ -4,7 +4,7 @@ from collections import Counter
 from sklearn.tree import _tree
 from sklearn.externals import six
 import itertools
-
+import numpy as np
 
 
 def leaf_iter(tree, feature_names=None, class_names=None, report = 'ft', include_leaf = False):
@@ -17,7 +17,7 @@ def leaf_iter(tree, feature_names=None, class_names=None, report = 'ft', include
 
     node_id = 0
 
-    def recurse(node_id, path=[]):
+    def recurse(node_id, path_):
         assert node_id < len(tree.children_left)
         assert node_id < len(tree.children_right)
         left_child = tree.children_left[node_id]
@@ -37,8 +37,7 @@ def leaf_iter(tree, feature_names=None, class_names=None, report = 'ft', include
                 'f': feature
             }[c])
 
-        path.append(tuple(v))
-        #path = path + [(feature, tree.threshold[node_id])]
+        path = path_ + (tuple(v), )
 
         if left_child == _tree.TREE_LEAF:
             if include_leaf:
@@ -50,7 +49,7 @@ def leaf_iter(tree, feature_names=None, class_names=None, report = 'ft', include
                 yield x
 
 
-    return recurse(node_id, [])
+    return recurse(node_id, ())
 
 
 
@@ -86,19 +85,11 @@ def make_subtree(tree, leaf_ids):
 
             leaf_ids = set(leaf_ids)
             inner_ids = set()
-            print 'leaf_ids=', leaf_ids
             for path in leaf_iter(tree, report='i', include_leaf=True):
                 if path[-1][0] in leaf_ids:
                     inner_ids.update(x[0] for x in path[:-1])
 
             ids = sorted(leaf_ids.union(inner_ids))
-
-            max_id = max(
-                np.max(tree.children_left),
-                np.max(tree.children_right)
-            )
-
-            print 'ids=', ids
 
             index_transform = np.full(tree.node_count + 1, -2, dtype=np.int)
             for i, id_ in enumerate(ids):
@@ -107,17 +98,10 @@ def make_subtree(tree, leaf_ids):
             # trick to keep -1 (special value for marking leaves) unmapped
             index_transform[-1] = -1
 
-            print 'index_transform', index_transform
-
             mask = np.zeros(len(index_transform) - 1, dtype=np.bool)
             mask[index_transform[:-1] != -2] = True
 
-            print 'mask', mask
-
             self.children_left = index_transform[ tree.children_left[mask] ]
-
-            print tree.children_left
-            print self.children_left
 
             self.children_right = index_transform[ tree.children_right[mask] ]
             self.feature = tree.feature[mask]
@@ -199,8 +183,8 @@ def export_graphviz(decision_tree, out_file="tree.dot", feature_names=None,
         value = pretty_samples(value)
 
         if tree.children_left[node_id] == _tree.TREE_LEAF:
-            return "%s = %.4f\\nsamples = %s\\n%s" \
-                   % (criterion,
+            return "(%d)\\n%s = %.4f\\nsamples = %s\\n%s" \
+                   % (node_id, criterion,
                       tree.impurity[node_id],
                       tree.n_node_samples[node_id],
                       value)
@@ -210,28 +194,15 @@ def export_graphviz(decision_tree, out_file="tree.dot", feature_names=None,
             else:
                 feature = "X[%s]" % tree.feature[node_id]
 
-            #return "%s <= %.4f\\n%s = %s\\nsamples = %s" \
-                   #% (feature,
-                      #tree.threshold[node_id],
-                      #criterion,
-                      #tree.impurity[node_id],
-                      #tree.n_node_samples[node_id])
-            #print 'feature', feature, 'node_id', node_id
-            #print "%s <= %.4f\\nsamples = %s" \
-                   #% (feature,
-                      #tree.threshold[node_id],
-                      #tree.n_node_samples[node_id])
-            return "%s <= %.4f\\nsamples = %s" \
-                   % (feature,
+            return "(%d)\\n%s <= %.4f\\nsamples = %s" \
+                   % (node_id,
+                      feature,
                       tree.threshold[node_id],
                       tree.n_node_samples[node_id])
 
     highlighted_nodes = set([0])
 
     def recurse(tree, node_id, criterion, parent=None, depth=0, left=False):
-
-        print '{}recurse({}, parent={}, depth={}, left={})'.format(
-            ' ' * depth, node_id, parent, depth, left)
 
         if node_id == _tree.TREE_LEAF:
             raise ValueError("Invalid node_id %s" % _tree.TREE_LEAF)
@@ -257,8 +228,6 @@ def export_graphviz(decision_tree, out_file="tree.dot", feature_names=None,
                     int(255 * min(1.0, 2.0 * i)),
                     int(255 * min(1.0, 2.0 - 2.0 * i))
                     )
-
-            #print 'node_id', node_id
 
             out_file.write('%d [label="%s", shape="box", style="filled", fillcolor="%s", penwidth=%d] ;\n' %
                            (node_id, node_to_str(tree, node_id, criterion), fillcolor, penwidth))
