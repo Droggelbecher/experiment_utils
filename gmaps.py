@@ -4,6 +4,18 @@ import json
 import matplotlib.pyplot as plt
 from matplotlib.colors import rgb2hex
 import numpy as np
+import decimal
+
+_gmaps_style = '''[{"featureType":"water","elementType":"geometry","stylers":[{"color":"#e9e9e9"},{"lightness":17}]},{"featureType":"landscape","elementType":"geometry","stylers":[{"color":"#f5f5f5"},{"lightness":20}]},{"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#ffffff"},{"lightness":17}]},{"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#ffffff"},{"lightness":29},{"weight":0.2}]},{"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#ffffff"},{"lightness":18}]},{"featureType":"road.local","elementType":"geometry","stylers":[{"color":"#ffffff"},{"lightness":16}]},{"featureType":"poi","elementType":"geometry","stylers":[{"color":"#f5f5f5"},{"lightness":21}]},{"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#dedede"},{"lightness":21}]},{"elementType":"labels.text.stroke","stylers":[{"visibility":"on"},{"color":"#ffffff"},{"lightness":16}]},{"elementType":"labels.text.fill","stylers":[{"saturation":36},{"color":"#333333"},{"lightness":40}]},{"elementType":"labels.icon","stylers":[{"visibility":"off"}]},{"featureType":"transit","elementType":"geometry","stylers":[{"color":"#f2f2f2"},{"lightness":19}]},{"featureType":"administrative","elementType":"geometry.fill","stylers":[{"color":"#fefefe"},{"lightness":20}]},{"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#fefefe"},{"lightness":17},{"weight":1.2}]}]'''
+
+
+
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, decimal.Decimal):
+            return float(o)
+        return super(DecimalEncoder, self).default(o)
+
 
 def generate_html_bar_graph(heights, names = None):
     w = 30
@@ -40,7 +52,7 @@ def generate_html_bar_graph(heights, names = None):
 
     return r
 
-def polylines(ll):
+def polylines(ll, arrows = False):
     """
     ll = [
             [(lat, lon), (lat, lon), (lat, lon), ...]
@@ -48,12 +60,15 @@ def polylines(ll):
          ]
     """
     for l, c in zip(ll, plt.cm.Set2(np.linspace(0, 1, len(ll)))):
-        yield {
+        d = {
                 'path': [ { 'lat': lat, 'lng': lng } for lat, lng in l ],
                 'strokeColor': rgb2hex(c),
                 'strokeWeight': 2,
                 'strokeOpacity': 0.8,
                 }
+        if arrows:
+            d.update({ '_ARROW': True })
+        yield d
 
 def weighted_lines(weights, endpoints, color_pos = '#00ff00', color_neg = '#ff0000', opacity = 0.5):
     min_weight = min(weights)
@@ -144,7 +159,7 @@ def generate_gmaps(
             if k == '_ARROW':
                 d['icons'] = "[{ icon: { path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW }, offset: '100%' }]"
             else:
-                d[k] = json.dumps(v)
+                d[k] = json.dumps(v, cls=DecimalEncoder)
 
         s = '{ ' + ','.join('{}: {}'.format(k, v) for k,v in d.items()) + '}'
         ls.append(s)
@@ -189,22 +204,7 @@ var circles = [
     {}
     ];
 
-var customMapType = new google.maps.StyledMapType([
-      {{
-        stylers: [
-          {{visibility: 'simplified'}},
-          {{gamma: 0.9}},
-          {{weight: 0.5}},
-          {{saturation: 0.01}}
-        ]
-      }},
-      {{
-        elementType: 'labels',
-        stylers: [{{visibility: 'off'}}]
-      }}
-    ], {{
-      name: 'Custom Style'
-  }});
+var customMapType = new google.maps.StyledMapType({});
 var customMapTypeId = 'custom_style';
 
 function initialize()
@@ -263,6 +263,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
         s_lines, s_markers,
         ',\n'.join('{{location: new google.maps.LatLng({}, {}), weight: {:.8f} }}'.format(lat, lon, float(w)) for (lat, lon, w) in heatmap),
         ','.join('new google.maps.Circle({})'.format(json.dumps(c)) for c in circles),
+        _gmaps_style,
         size[0], size[1],
 
         ''.join('<td style="background-color: {};">{}</td>'.format(c, i) for i, c in enumerate(colors)) if legend else '',
