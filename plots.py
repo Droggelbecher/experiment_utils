@@ -16,6 +16,8 @@ from matplotlib import rc
 rc('text', usetex=True)
 rc('font', family='serif')
 
+import iterutils
+
 def fill_between_steps(ax, x, y1, y2=0, step_where='pre', **kwargs):
     ''' fill between a step plot and 
 
@@ -208,11 +210,16 @@ def curves(xss, yss,
            invert_x = False,
            xlabel = None, ylabel = None,
            xoffsets = None,
+           yoffsets = None,
            xlog = False, ylog = False,
            xlim = None, ylim = None,
            step = False,
            closeups_x = [],
            linestyle = '-',
+           legendrows = 2,
+           cm = plt.cm.Dark2,
+           minmax_style = 'filled',
+           markers = '^os',
           ):
 
     xlim_ = xlim
@@ -229,8 +236,6 @@ def curves(xss, yss,
                 filename + filename_ + '_closeup{}'.format(i) + '.pdf'
             else:
                 filename = m.groups()[0] + '_closeup{}'.format(i) + m.groups()[1]
-
-
 
         if xlog:
             ax.set_xscale('log', basex=xlog)
@@ -253,34 +258,50 @@ def curves(xss, yss,
         if xoffsets is None:
             xoffsets = 0
 
-        offs = None 
-        for xs, ys, ys_min, ys_max, c, label in zip(
-                xss,
-                yss,
-                yss_min,
-                yss_max,
-                plt.cm.Dark2(np.linspace(0, 1, len(yss))),
-                labels):
+        if yoffsets is None:
+            yoffsets = 0
 
-            if type(xoffsets) in (int, float):
-                xoffsets = [xoffsets] * len(xs)
-            if offs is None:
-                offs = np.zeros(len(xs))
+        offsx = 0 
+        offsy = 0
+        for xs, ys, ys_min, ys_max, c, label, marker in zip(
+            xss,
+            yss,
+            yss_min,
+            yss_max,
+            cm(np.linspace(0, 1, len(yss))),
+            labels,
+            iterutils.repeat_to(markers, len(xss))
+        ):
+
+            aox = np.full((len(xs), ), offsx)
+            aoy = np.full((len(ys), ), offsy)
+
+            offsx += xoffsets
+            offsy += yoffsets
 
             if step:
-                ax.step(xs + offs, ys, linestyle, where = 'post', c = c, label = label)
+                ax.step(xs + aox, ys + aoy, linestyle, where = 'post', c = c, label = label, markeredgewidth = 0.0)
 
             else:
-                ax.plot(xs + offs, ys, linestyle, c = c, label = label)
+                if minmax_style == 'error' and ys_min is not None and ys_max is not None:
+                    ax.plot(
+                        xs + aox, ys + aoy,
+                        yerr = [ys_min + aoy, ys_max + aoy],
+                        linestyle = linestyle,
+                        marker = marker,
+                        c = c,
+                        label = label,
+                        markeredgewidth = 0.0
+                    )
+                else:
+                    ax.plot(xs + aox, ys + aoy, linestyle, marker = marker, c = c, label = label, markeredgewidth = 0.0)
 
-            if ys_min is not None and ys_max is not None:
+            if ys_min is not None and ys_max is not None and minmax_style == 'filled':
                 if step:
-                    fill_between_steps(ax, xs + offs, ys_min, ys_max, color = c, alpha = 0.1, linestyle = '--', step_where = 'post')
+                    fill_between_steps(ax, xs + aox, ys_min + aoy, ys_max + aoy, color = c, alpha = 0.1, linestyle = '--', step_where = 'post')
 
                 else:
-                    ax.fill_between(xs + offs, ys_min, ys_max, color = c, alpha = 0.1)
-
-            offs += xoffsets
+                    ax.fill_between(xs + aox, ys_min + aoy, ys_max + aoy, color = c, alpha = 0.1)
 
         if xlabel:
             ax.set_xlabel(xlabel)
@@ -294,7 +315,7 @@ def curves(xss, yss,
         if ylim is not None:
             ax.set_ylim(ylim)
 
-        ax.legend(loc='upper center', prop={'size': 8}, bbox_to_anchor=(0.5, 1.1), ncol=int(math.ceil(len(yss) / 2.0)), fancybox=True)
+        ax.legend(loc='upper center', prop={'size': 8}, bbox_to_anchor=(0.5, 1.1), ncol=int(math.ceil(len(yss) / legendrows)), fancybox=True)
         logging.debug('creating {}'.format(filename))
         fig.savefig(filename, bbox_inches='tight')
         plt.close(fig)
@@ -363,7 +384,7 @@ def boxplots(xs, yss, filename):
 
     plt.savefig(filename, dpi=100, bbox_inches='tight')
 
-def multi_boxplots(xs, ysss, filename, ylim = (-0.05, 1.05), labels = [], toplabels = [], points = True, xlabel = '', ylabel = ''):
+def multi_boxplots(xs, ysss, filename, ylim = (-0.05, 1.05), labels = [], toplabels = [], points = True, xlabel = '', ylabel = '', legendrows = 2, cm = plt.cm.Dark2):
     """
     ysss = [
             [ [ x x x x ], ... ],
@@ -383,7 +404,22 @@ def multi_boxplots(xs, ysss, filename, ylim = (-0.05, 1.05), labels = [], toplab
     """
 
     fig, axes = plt.subplots(1, 1, figsize=(14, 7))
-    top = ylim[1] * 1.1
+
+    if ylim is None:
+        elems = iterutils.flatten(ysss)
+        if len(elems):
+            ylim = (min(elems), max(elems))
+
+            delta = (ylim[1] - ylim[0]) * 0.05
+            ylim = (ylim[0] - delta, ylim[1] + delta)
+
+        else:
+            ylim = (0, 1)
+
+
+
+
+    top = ylim[1] + (ylim[1] - ylim[0]) * 0.1
 
     k = len(ysss) + 1
     dummylines = []
@@ -396,7 +432,8 @@ def multi_boxplots(xs, ysss, filename, ylim = (-0.05, 1.05), labels = [], toplab
 
     for yss, c, offset, tlables in zip(
             ysss,
-            plt.cm.Dark2(np.linspace(0, 1, len(ysss))),
+            #plt.cm.Dark2(np.linspace(0, 1, len(ysss))),
+            cm(np.linspace(0, 1, len(ysss))),
             range(1, 1 + len(ysss)),
             toplabels
             ):
@@ -404,17 +441,18 @@ def multi_boxplots(xs, ysss, filename, ylim = (-0.05, 1.05), labels = [], toplab
 
         # each yss is a data set and gets one color
         ps = range(offset, len(yss) * k + offset, k)
-        bp = axes.boxplot(yss,
-                vert = True,
-                boxprops={'color': c},
-                widths = 0.6,
-                positions = ps)
 
-        # Style the box
+        if len(yss):
+            bp = axes.boxplot(yss,
+                    vert = True,
+                    boxprops={'color': c},
+                    widths = 0.6,
+                    positions = ps)
 
-        for key, v in bp.items():
-            for e in v:
-                plt.setp(e, color = c)
+            # Style the box
+            for key, v in bp.items():
+                for e in v:
+                    plt.setp(e, color = c)
 
         # dummy line for legend
         h, = plt.plot([1, 1], c = c, color = c, linestyle='-')
@@ -435,14 +473,17 @@ def multi_boxplots(xs, ysss, filename, ylim = (-0.05, 1.05), labels = [], toplab
     axes.set_ylabel(ylabel)
 
 
-    plt.legend(dummylines, labels, loc='upper center', prop={'size': 10}, bbox_to_anchor=(0.5,1.1), ncol=int(math.ceil(len(dummylines)/2.0)), fancybox=True)
+    if len(dummylines) > 1:
+        plt.legend(dummylines, labels, loc='upper center', prop={'size': 10}, bbox_to_anchor=(0.5,1.1), ncol=int(math.ceil(len(dummylines)/legendrows)), fancybox=True)
     for l in dummylines:
         l.set_visible(False)
 
     plt.setp(axes, xticks = np.arange(k/2.0, k/2.0 + maxlen * k, k), xticklabels=xs)
     axes.set_xlim((0, maxlen * k))
-    ylim = (ylim[0], top)
-    axes.set_ylim(ylim)
+
+    if ylim is not None:
+        ylim = (ylim[0], top)
+        axes.set_ylim(ylim)
 
     fig.savefig(filename, dpi=100, bbox_inches = 'tight')
     plt.close(fig)

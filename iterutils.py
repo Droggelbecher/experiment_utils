@@ -15,6 +15,26 @@ def chunks(list_, n):
     for i in range(0, len(list_), sz):
         yield list_[i:i + sz]
 
+
+def unique(list_):
+
+    from collections import OrderedDict
+
+    return list(OrderedDict.fromkeys(list_))
+
+def flatten(list_):
+    r = []
+    for item in list_:
+        if type(item) in (tuple, list):
+            r.extend(flatten(item))
+        else:
+            r.append(item)
+    return r
+
+def repeat_to(l, n):
+    return tuple(itertools.islice(itertools.cycle(l), n))
+
+
 class CV:
     def __init__(self, n, parts):
         self.n = n
