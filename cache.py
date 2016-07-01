@@ -220,11 +220,15 @@ def cached(filename_kws=(), ignore_kws=(), add_filenames=(), cache_if=ALWAYS, co
             # Save to cache
 
             if exception is not None and cache_result != CACHE_COLLISION:
+                reduced_kws = dict(kws)
+                for k in ignare_kws:
+                    del reduced_kws[k]
+
                 cache_data = {
                     'timestamp':  time.time(),
                     'computation_time': dt,
                     'function_name':  f.__name__,
-                    'kws':  kws,
+                    'kws': reduced_kws,
                     'return_value':  None,
                     'exception': e
                 }
@@ -238,11 +242,15 @@ def cached(filename_kws=(), ignore_kws=(), add_filenames=(), cache_if=ALWAYS, co
                 raise e
 
             elif cache_result != CACHE_COLLISION and cache_if(kws):
+                reduced_kws = dict(kws)
+                for k in ignare_kws:
+                    del reduced_kws[k]
+
                 cache_data = {
                     'timestamp':  time.time(),
                     'computation_time': dt,
                     'function_name':  f.__name__,
-                    'kws':  kws,
+                    'kws': reduced_kws,
                     'return_value':  r,
                     'exception': None,
                 }
