@@ -1,5 +1,6 @@
 
 import math
+import itertools
 
 def chunks(list_, n):
     """

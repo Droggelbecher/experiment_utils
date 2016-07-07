@@ -152,7 +152,7 @@ def clear_caches():
 ALWAYS = lambda kws: True
 NEVER = lambda kws: False
 
-def cached(filename_kws=(), ignore_kws=(), add_filenames=(), cache_if=ALWAYS, compute_if=ALWAYS, cache_exception = ALWAYS):
+def cached(filename_kws=(), ignore_kws=(), add_filenames=(), cache_if=ALWAYS, compute_if=ALWAYS, cache_exception = NEVER):
     """
     >>> @cached()
     ... def f(x):
@@ -221,7 +221,7 @@ def cached(filename_kws=(), ignore_kws=(), add_filenames=(), cache_if=ALWAYS, co
 
             if exception is not None and cache_result != CACHE_COLLISION:
                 reduced_kws = dict(kws)
-                for k in ignare_kws:
+                for k in ignore_kws:
                     del reduced_kws[k]
 
                 cache_data = {
@@ -243,7 +243,7 @@ def cached(filename_kws=(), ignore_kws=(), add_filenames=(), cache_if=ALWAYS, co
 
             elif cache_result != CACHE_COLLISION and cache_if(kws):
                 reduced_kws = dict(kws)
-                for k in ignare_kws:
+                for k in ignore_kws:
                     del reduced_kws[k]
 
                 cache_data = {

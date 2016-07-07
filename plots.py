@@ -220,6 +220,8 @@ def curves(xss, yss,
            cm = plt.cm.Dark2,
            minmax_style = 'filled',
            markers = '^os',
+           markeverys = [],
+           grid = False
           ):
 
     xlim_ = xlim
@@ -261,17 +263,34 @@ def curves(xss, yss,
         if yoffsets is None:
             yoffsets = 0
 
+        if len(markeverys) < len(xss):
+            markeverys += [ None ] * (len(xss) - len(markeverys))
+
+        ax.yaxis.grid(grid, which = 'major', linestyle='-', color='.8')
+        ax.yaxis.grid(grid, which = 'minor', linestyle=':', color='.8')
+
+
         offsx = 0 
         offsy = 0
-        for xs, ys, ys_min, ys_max, c, label, marker in zip(
+        for xs, ys, ys_min, ys_max, c, label, marker, markevery in zip(
             xss,
             yss,
             yss_min,
             yss_max,
             cm(np.linspace(0, 1, len(yss))),
             labels,
-            iterutils.repeat_to(markers, len(xss))
+            iterutils.repeat_to(markers, len(xss)),
+            markeverys
         ):
+            ys = np.array(ys)
+            xs = np.array(xs)
+
+            if ys_min is not None:
+                ys_min = np.array(ys_min)
+
+            if ys_max is not None:
+                ys_max = np.array(ys_max)
+            
 
             aox = np.full((len(xs), ), offsx)
             aoy = np.full((len(ys), ), offsy)
@@ -284,14 +303,19 @@ def curves(xss, yss,
 
             else:
                 if minmax_style == 'error' and ys_min is not None and ys_max is not None:
-                    ax.plot(
+                    ax.plot(xs + aox, ys + aoy, linestyle, marker = marker, c = c, label = label, markeredgewidth = 0.0, markevery = markevery, markersize=8)
+                    ax.errorbar(
                         xs + aox, ys + aoy,
-                        yerr = [ys_min + aoy, ys_max + aoy],
-                        linestyle = linestyle,
-                        marker = marker,
+                        yerr = [-(ys_min - ys + aoy), ys_max - ys + aoy],
+                        alpha = 0.5,
+                        lolims = True,
+                        uplims = True,
+                        linestyle = '',
+                        linewidth = 0,
+                        elinewidth = 0.5,
                         c = c,
-                        label = label,
-                        markeredgewidth = 0.0
+                        markeredgecolor = c,
+                        color = c,
                     )
                 else:
                     ax.plot(xs + aox, ys + aoy, linestyle, marker = marker, c = c, label = label, markeredgewidth = 0.0)
@@ -302,6 +326,13 @@ def curves(xss, yss,
 
                 else:
                     ax.fill_between(xs + aox, ys_min + aoy, ys_max + aoy, color = c, alpha = 0.1)
+
+            # "Special" markers
+
+            #saox = np.full((len(sxs), ), offsx)
+            #saoy = np.full((len(sys), ), offsy)
+            #ax.plot(sxs + saox, sys + saoy, '', marker = '*', c = c)
+
 
         if xlabel:
             ax.set_xlabel(xlabel)
@@ -315,7 +346,11 @@ def curves(xss, yss,
         if ylim is not None:
             ax.set_ylim(ylim)
 
-        ax.legend(loc='upper center', prop={'size': 8}, bbox_to_anchor=(0.5, 1.1), ncol=int(math.ceil(len(yss) / legendrows)), fancybox=True)
+        logging.debug('len(yss)={} legendrows={}'.format(len(yss), legendrows))
+        try:
+            ax.legend(loc='upper center', prop={'size': 10}, bbox_to_anchor=(0.5, 1.075), ncol=int(math.ceil(len(yss) / legendrows)), fancybox=True)
+        except IndexError:
+            pass
         logging.debug('creating {}'.format(filename))
         fig.savefig(filename, bbox_inches='tight')
         plt.close(fig)
