@@ -14,7 +14,7 @@ import matplotlib.transforms as mtrans
 
 from matplotlib import rc
 rc('text', usetex=True)
-rc('font', family='serif')
+rc('font', family='serif', size = 12)
 
 import iterutils
 
@@ -221,14 +221,37 @@ def curves(xss, yss,
            minmax_style = 'filled',
            markers = '^os',
            markeverys = [],
-           grid = False
+           grid = False,
+           figsize = None,
           ):
 
     xlim_ = xlim
     filename_ = filename
+    if len(labels) < len(xss):
+        labels += [''] * (len(xss) - len(labels))
+
+    if len(yss_min) < len(yss):
+        yss_min += [None] * (len(yss) - len(yss_min))
+
+    if len(yss_max) < len(yss):
+        yss_max += [None] * (len(yss) - len(yss_max))
+
+    if xoffsets is None:
+        xoffsets = 0
+
+    if yoffsets is None:
+        yoffsets = 0
+
+    if len(markeverys) < len(xss):
+        markeverys += [ None ] * (len(xss) - len(markeverys))
+
+    if isinstance(linestyle, str):
+        linestyle = [linestyle]
+
+
 
     for i, xlim in enumerate([xlim_] + closeups_x):
-        fig, ax = plt.subplots(1, 1)
+        fig, ax = plt.subplots(1, 1, figsize = figsize)
 
         if i == 0:
             filename = filename_
@@ -248,31 +271,12 @@ def curves(xss, yss,
         if invert_x:
             ax.invert_xaxis()
 
-        if len(labels) < len(xss):
-            labels += [''] * (len(xss) - len(labels))
-
-        if len(yss_min) < len(yss):
-            yss_min += [None] * (len(yss) - len(yss_min))
-
-        if len(yss_max) < len(yss):
-            yss_max += [None] * (len(yss) - len(yss_max))
-
-        if xoffsets is None:
-            xoffsets = 0
-
-        if yoffsets is None:
-            yoffsets = 0
-
-        if len(markeverys) < len(xss):
-            markeverys += [ None ] * (len(xss) - len(markeverys))
-
         ax.yaxis.grid(grid, which = 'major', linestyle='-', color='.8')
         ax.yaxis.grid(grid, which = 'minor', linestyle=':', color='.8')
 
-
         offsx = 0 
         offsy = 0
-        for xs, ys, ys_min, ys_max, c, label, marker, markevery in zip(
+        for xs, ys, ys_min, ys_max, c, label, marker, markevery, ls in zip(
             xss,
             yss,
             yss_min,
@@ -280,7 +284,8 @@ def curves(xss, yss,
             cm(np.linspace(0, 1, len(yss))),
             labels,
             iterutils.repeat_to(markers, len(xss)),
-            markeverys
+            markeverys,
+            iterutils.repeat_to(linestyle, len(xss)),
         ):
             ys = np.array(ys)
             xs = np.array(xs)
@@ -299,17 +304,18 @@ def curves(xss, yss,
             offsy += yoffsets
 
             if step:
-                ax.step(xs + aox, ys + aoy, linestyle, where = 'post', c = c, label = label, markeredgewidth = 0.0)
+                ax.step(xs + aox, ys + aoy, ls, where = 'post', c = c, label = label, markeredgewidth = 0.0)
 
             else:
                 if minmax_style == 'error' and ys_min is not None and ys_max is not None:
-                    ax.plot(xs + aox, ys + aoy, linestyle, marker = marker, c = c, label = label, markeredgewidth = 0.0, markevery = markevery, markersize=8)
+                    ax.plot(xs + aox, ys + aoy, ls, marker = marker, c = c, label = label, markeredgewidth = 0.0, markevery = markevery, markersize=8)
                     ax.errorbar(
                         xs + aox, ys + aoy,
                         yerr = [-(ys_min - ys + aoy), ys_max - ys + aoy],
-                        alpha = 0.5,
-                        lolims = True,
-                        uplims = True,
+                        alpha = 0.8,
+                        #lolims = True,
+                        #uplims = True,
+                        capsize = 1.5,
                         linestyle = '',
                         linewidth = 0,
                         elinewidth = 0.5,
@@ -318,7 +324,7 @@ def curves(xss, yss,
                         color = c,
                     )
                 else:
-                    ax.plot(xs + aox, ys + aoy, linestyle, marker = marker, c = c, label = label, markeredgewidth = 0.0)
+                    ax.plot(xs + aox, ys + aoy, ls, marker = marker, c = c, label = label, markeredgewidth = 0.0)
 
             if ys_min is not None and ys_max is not None and minmax_style == 'filled':
                 if step:
@@ -348,7 +354,14 @@ def curves(xss, yss,
 
         logging.debug('len(yss)={} legendrows={}'.format(len(yss), legendrows))
         try:
-            ax.legend(loc='upper center', prop={'size': 10}, bbox_to_anchor=(0.5, 1.075), ncol=int(math.ceil(len(yss) / legendrows)), fancybox=True)
+            ax.legend(
+                loc='upper center',
+                prop={'size': 8},
+                bbox_to_anchor=(0.5, 1.2),
+                ncol=int(math.ceil(len(yss) / legendrows)),
+                fancybox=True,
+                frameon=False
+            )
         except IndexError:
             pass
         logging.debug('creating {}'.format(filename))
