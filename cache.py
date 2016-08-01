@@ -9,7 +9,26 @@ import time
 import shutil
 import logging
 
+WRITE_CACHE = True
+READ_CACHE = True
+
 base_directory = os.path.abspath('_cache')
+
+def add_arguments(parser):
+
+    parser.add_argument(
+        '--no-cache',
+        help = 'disable reading and writing of cached values'
+    )
+
+    return parser
+
+def process_arguments(args):
+
+    if args.no_cache:
+        WRITE_CACHE = False
+        READ_CACHE = False
+
 
 def cache_hash(obj):
     """
@@ -112,6 +131,9 @@ def _verify_cache(cache_data, f, kws, ignore_kws):
     )
 
 def _get_from_cache(cache_path, f, kws, ignore_kws, filenames):
+    if not READ_CACHE:
+        return CACHE_NOT_AVAILABLE
+
     if os.path.exists(cache_path):
         # A matching cache file exists!
         # Now find out whether it is up-to-date
@@ -219,7 +241,8 @@ def cached(filename_kws=(), ignore_kws=(), add_filenames=(), cache_if=ALWAYS, co
 
             # Save to cache
 
-            if exception is not None and cache_result != CACHE_COLLISION:
+            # Exception case
+            if exception is not None and cache_result != CACHE_COLLISION and (WRITE_CACHE and cache_if(kws)):
                 reduced_kws = dict(kws)
                 for k in ignore_kws:
                     del reduced_kws[k]
@@ -241,7 +264,8 @@ def cached(filename_kws=(), ignore_kws=(), add_filenames=(), cache_if=ALWAYS, co
                 cache_file.close()
                 raise e
 
-            elif cache_result != CACHE_COLLISION and cache_if(kws):
+            # "Normal" case
+            elif cache_result != CACHE_COLLISION and (WRITE_CACHE and cache_if(kws)):
                 reduced_kws = dict(kws)
                 for k in ignore_kws:
                     del reduced_kws[k]
