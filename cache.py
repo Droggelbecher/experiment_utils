@@ -18,12 +18,15 @@ def add_arguments(parser):
 
     parser.add_argument(
         '--no-cache',
+        action = 'store_true',
         help = 'disable reading and writing of cached values'
     )
 
     return parser
 
 def process_arguments(args):
+    global WRITE_CACHE
+    global READ_CACHE
 
     if args.no_cache:
         WRITE_CACHE = False
@@ -106,15 +109,12 @@ def cache_hash(obj):
         r = cache_hash( (obj.__class__.__name__, obj.__dict__) )
     else:
         raise TypeError("dont know how to hash {} of type {}".format(obj, type(obj)))
-
-    logging.debug("hashing {} of type {} --> {}".format(obj, type(obj), r))
     return r
 
 
 
 def _cache_name(f, args, kws, ignore_kws=()):
     items = tuple(x for x in sorted(kws.items(), key=lambda p: cache_hash(p[0])) if x[0] not in ignore_kws)
-    logging.debug("hashing items: {}".format([i[0] for i in items]))
     return f.__name__ + '-{:08x}'.format( cache_hash( (args, items) ))
 
 def _cache_path(f, args, kws, ignore_kws):
@@ -132,7 +132,7 @@ def _verify_cache(cache_data, f, kws, ignore_kws):
 
 def _get_from_cache(cache_path, f, kws, ignore_kws, filenames):
     if not READ_CACHE:
-        return CACHE_NOT_AVAILABLE
+        return CACHE_NOT_AVAILABLE, None
 
     if os.path.exists(cache_path):
         # A matching cache file exists!
