@@ -6,7 +6,13 @@ import metrics
 class Features:
     def __init__(self, *args):
         self.features = args
+        self._update_indices()
 
+    def append(self, feat):
+        self.features.append(feat)
+        self._update_indices()
+
+    def _update_indices(self):
         p = 0
         for f in self.features:
             f.start = p
@@ -14,6 +20,14 @@ class Features:
             setattr(self, f.name, f)
             p += len(f.keys)
         self._len = p
+
+    def __subtract__(self, feat):
+        fs = self.features[:]
+        for i, f in enumerate(fs):
+            if f.name == feat:
+                del fs[i]
+                break
+        return Features(fs)
 
     def __contains__(self, fname):
         return hasattr(self, fname) and type(getattr(self, fname)) is Feature
