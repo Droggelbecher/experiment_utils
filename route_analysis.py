@@ -4,11 +4,11 @@ import numpy as np
 from sklearn.neighbors import KernelDensity
 import scipy
 import scipy.sparse
-#import csv
 import sys
 from datetime import datetime
 import math
-from collections import Counter
+from collections import Counter, defaultdict
+import logging
 
 from features import Features, PlainFeature, GeoFeature, BitSetFeature, OneHotFeature
 import metrics
@@ -17,100 +17,75 @@ import plots
 #csv.field_size_limit(sys.maxsize)
 
 class Routes:
-    def __init__(self, d):
+    def __init__(self, track_reader):
         self.cv_range = (0, 0)
 
-        #
-        # Conversion between road ids, indices and coordinates
-        #
-
-        road_ids_to_endpoints = d['road_ids_to_endpoints']
-        self.road_ids_to_endpoints = road_ids_to_endpoints
-
-        # keys are of form (road_id, direction_flag)
-        assert len(self.road_ids_to_endpoints.keys()[0]) == 2
-
-        # values are of form ( (lat,lon), (lat,lon) )
-        assert len(self.road_ids_to_endpoints.values()[0]) == 2
-        assert len(self.road_ids_to_endpoints.values()[0][0]) == 2
-
-        sorted_road_ids = np.array(sorted(road_ids_to_endpoints.keys()), dtype='int64, int8')
-        self.id_to_idx = { tuple(id_): idx for (idx, id_) in enumerate(sorted_road_ids) }
-        self.idx_to_endpoints = np.array([road_ids_to_endpoints[tuple(id_)] for id_ in sorted_road_ids])
-
-        #
-        # Routes
-        #
-
-        routes = d['routes']
-        self._routes = routes
-
-        coordinate_routes = d['coordinate_routes']
-        self._coordinate_routes = coordinate_routes
-
-        assert len(self._routes) == len(self._coordinate_routes)
+        ids = set()
+        len_tracks = 0
+        for track in track_reader():
+            len_tracks += 1
+            for arc in track['track']:
+                ids.add(arc['roadid'])
+        sorted_road_ids = sorted(ids)
+        id_to_idx = { v: i for i, v in enumerate(sorted_road_ids) }
 
         self.F = Features(
-                GeoFeature('departure'),
-                GeoFeature('arrival'),
-
-                PlainFeature('weekday', (0, 7)),
-                PlainFeature('hour', (0, 24)),
-
+                GeoFeature('origin'),
+                GeoFeature('destination'),
+                PlainFeature('day_of_week', (0, 7)),
+                PlainFeature('hour_of_day', (0, 24)),
                 # Minutes since midnight
                 PlainFeature('minute_of_day', (0, 24 * 60)),
-
                 # Keeping  the one-hot variants now for data display in html
-                OneHotFeature('weekdays', range(7)),
-                OneHotFeature('hours', range(24)),
-
+                OneHotFeature('day_of_week_onehot', range(7)),
+                OneHotFeature('hour_of_day_onehot', range(24)),
                 BitSetFeature('route', sorted_road_ids),
                 )
 
-        X = np.zeros(shape = (len(routes), len(self.F)))
+        X = np.zeros(shape = (len_tracks, len(self.F)))
 
-        #
-        # Arrival / Departure
-        #
-        for i, c in enumerate(coordinate_routes):
-            self.F.departure.encode(X[i, :], c[0])
-            assert np.any(self.F.departure(X[i, :]) != 0)
+        id_to_point_pair = {}
+        for i, track in enumerate(track_reader()):
+            id_to_point_pair = merge_arc_coordinates( id_to_point_pair, extract_arc_coordinates(track) )
 
-            self.F.arrival.encode(X[i, :], c[-1])
-            assert np.any(self.F.arrival(X[i, :]) != 0)
+            if i % 10 == 0:
+                logging.debug('{:4d}/{:4d} tracks read'.format(i, len_tracks))
 
-        #
-        # Departure Time
-        #
-        for i, departure_time in enumerate(d['departure_times']):
-            dt = datetime.utcfromtimestamp(departure_time)
-            self.F.weekday.encode(X[i, :], dt.weekday())
-            self.F.hour.encode(X[i, :], dt.hour)
+            origin = track['track'][0]
+            destination = track['track'][-1]
 
-            self.F.minute_of_day.encode(X[i, :], dt.hour * 60 + dt.minute)
+            self.F.origin.encode(X[i, :], (origin['lat'], origin['lon']))
+            self.F.destination.encode(X[i, :], (destination['lat'], destination['lon']))
 
-            self.F.weekdays.encode(X[i, :], dt.weekday())
-            self.F.hours.encode(X[i, :], dt.hour)
+            # Do we have a departure time?
+            deptime = origin.get('t', None)
 
-        #
-        # Actual Route
-        #
-        a_road_ids, a_arrival_arcs = routes_to_array(routes, self.id_to_idx)
-        self.F.route.encode(X, a_road_ids)
+            if deptime is not None:
+                dt = datetime.utcfromtimestamp(deptime)
+                self.F.day_of_week.encode(X[i, :], dt.weekday())
+                self.F.hour_of_day.encode(X[i, :], dt.hour)
+                self.F.minute_of_day.encode(X[i, :], dt.hour * 60 + dt.minute)
+                self.F.day_of_week_onehot.encode(X[i, :], dt.weekday())
+                self.F.hour_of_day_onehot.encode(X[i, :], dt.hour)
 
-        #
-        # Guess partial adjacency matrix from data
-        #
-        A = np.zeros(shape=(len(road_ids_to_endpoints), len(road_ids_to_endpoints)))
-        idx = self.id_to_idx
-        for route in routes:
-            for id1, id2 in zip(route, route[1:]):
-                A[idx[id1], idx[id2]] = 1.0
+            ids = set()
+            for ris in track['roadid_seq']:
+                ids.add(id_to_idx[ris[0]])
+                a_ids = np.zeros(len(sorted_road_ids))
+                for id in ids:
+                    a_ids[id] = 1.0
+                self.F.route.encode(X, a_ids)
 
-        plots.matrix(X[:,:100], '/tmp/X.png')
-
+        self.id_to_point_pair = id_to_point_pair
+        self.len_tracks = len_tracks
+        self.id_to_idx = id_to_idx
+        #self._routes = tracks
         self._X = X
-        self.A = A
+        self.track_reader = track_reader
+
+
+
+        return
 
     def _validation_index_to_abs(self, i):
         return self.cv_range[0] + i
@@ -139,17 +114,28 @@ class Routes:
         return self._X[self.cv_range[0], self.cv_range[1]]
 
 
-    def get_learn_coordinate_routes(self):
-        for i in self._learn_range():
-            yield self._coordinate_routes[i]
+    def get_learn_tracks(self):
+        for i, t in enumerate(self.track_reader()):
+            if i < self.cv_range[0] or i >= self.cv_range[1]:
+                yield [x[0] for x in t['roadid_seq']]
 
-    def get_learn_routes(self):
-        for i in self._learn_range():
-            yield self._routes[i]
+    def get_validation_tracks(self):
+        for i, t in enumerate(self.track_reader()):
+            if i < self.cv_range[0] or i >= self.cv_range[1]:
+                yield [x[0] for x in t['roadid_seq']]
 
-    def get_validation_routes(self):
-        for i in self._validation_range():
-            yield self._routes[i]
+
+    #def get_learn_coordinate_routes(self):
+        #for i in self._learn_range():
+            #yield self._coordinate_routes[i]
+
+    #def get_learn_routes(self):
+        #for i in self._learn_range():
+            #yield self._routes[i]
+
+    #def get_validation_routes(self):
+        #for i in self._validation_range():
+            #yield self._routes[i]
 
 
     def get_learn_features(self):
@@ -188,10 +174,13 @@ class Routes:
         """
         return self.F.route.keys[self.F.route(r) != 0]
 
-    def array_to_point_pairs(self, r):
-        route = self.F.route(r)
-        point_pairs = [(tuple(sx), tuple(ex)) for sx, ex in self.idx_to_endpoints[route != 0, :]]
-        return point_pairs
+    #def array_to_point_pairs(self, r):
+        #route = self.F.route(r)
+        #point_pairs = [(tuple(sx), tuple(ex)) for sx, ex in self.idx_to_endpoints[route != 0, :]]
+        #return point_pairs
+
+    def route_to_point_pairs(self, r):
+        return [self.id_to_point_pair[x] for x in r if x is not None]
 
     def distance(self, r1, r2, **kws):
         return self.F.distance(r1, r2, **kws)
@@ -207,6 +196,47 @@ class Routes:
                 r_min = r2
 
         return r_min, d_min
+
+
+def extract_arc_coordinates(track):
+    """
+    return: { arcid => (start, end) }
+    """
+
+    r = {}
+    arcid = None
+    pos = None
+    pos_new = None
+
+    for arc in track['track']:
+        arcid_new = arc['roadid']
+
+        if arcid_new is not None:
+            pos_new = (float(arc['lat']), float(arc['lon']))
+
+        if arcid_new != arcid:
+            # Leaving old arc
+            if arcid is not None:
+                r[arcid][1] = pos
+
+            # Entering new arc
+            arcid = arcid_new
+            if arcid is not None:
+                r[arcid] = [pos_new, pos_new]
+
+        if pos_new is not None:
+            pos = pos_new
+
+
+    if arcid is not None:
+        r[arcid][1] = pos
+
+    return r
+
+def merge_arc_coordinates(r1, r2):
+    r = dict(r1)
+    r.update(r2)
+    return r
 
 
 def to_directed_arcs(route, coordinate_route, road_ids_to_endpoints):
@@ -264,7 +294,7 @@ def routes_to_array(routes, ids, unknowns = 'raise', default = 0.0):
     routes: iterable over (iterable over route ids)
     ids: dict: id->idx
 
-    return: sparse matrix with shape (len(routes), len(ids)),
+    return: matrix with shape (len(routes), len(ids)),
         containing 1 if road id belongs to that route
     """
     assert type(ids) is dict

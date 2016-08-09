@@ -6,8 +6,8 @@ import math
 import logging
 import re
 
-#import matplotlib
-#matplotlib.use('TkAgg')
+import matplotlib
+matplotlib.use('Agg')
 
 import matplotlib.pyplot as plt
 import matplotlib.transforms as mtrans

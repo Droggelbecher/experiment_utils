@@ -2,6 +2,7 @@
 import sys
 import numpy as np
 import metrics
+import logging
 
 class Features:
     def __init__(self, *args):
@@ -21,13 +22,13 @@ class Features:
             p += len(f.keys)
         self._len = p
 
-    def __subtract__(self, feat):
-        fs = self.features[:]
+    def __sub__(self, feat):
+        fs = list(self.features)
         for i, f in enumerate(fs):
             if f.name == feat:
                 del fs[i]
                 break
-        return Features(fs)
+        return Features(*fs)
 
     def __contains__(self, fname):
         return hasattr(self, fname) and type(getattr(self, fname)) is Feature
