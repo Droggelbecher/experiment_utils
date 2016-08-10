@@ -84,9 +84,6 @@ class Routes:
         self.track_reader = track_reader
 
 
-
-        return
-
     def _validation_index_to_abs(self, i):
         return self.cv_range[0] + i
 
@@ -123,6 +120,11 @@ class Routes:
         for i, t in enumerate(self.track_reader()):
             if i < self.cv_range[0] or i >= self.cv_range[1]:
                 yield [x[0] for x in t['roadid_seq']]
+
+    def get_validation_routenames(self):
+        for i, t in enumerate(self.track_reader()):
+            if i < self.cv_range[0] or i >= self.cv_range[1]:
+                yield t['id']
 
 
     #def get_learn_coordinate_routes(self):

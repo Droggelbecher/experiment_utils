@@ -141,11 +141,11 @@ def generate_gmaps(
     #
 
     ms = []
-    for m in markers:
+    for i, m in enumerate(markers):
         d = m
         if isinstance(m, tuple) or isinstance(m, np.ndarray):
             # just a coordinate
-            d = { 'position': { 'lat': m[0], 'lng': m[1] }, 'title': '' }
+            d = { 'position': { 'lat': m[0], 'lng': m[1] }, 'title': '#{}'.format(i) }
         ms.append(d)
     s_markers = ',\n'.join('new google.maps.Marker({})'.format(json.dumps(m)) for m in ms)
 
