@@ -53,7 +53,7 @@ def generate_html_bar_graph(heights, names = None):
 
     return r
 
-def polylines(ll, arrows = False):
+def polylines(ll, arrows = False, weight = 2):
     """
     ll = [
             [(lat, lon), (lat, lon), (lat, lon), ...]
@@ -64,7 +64,7 @@ def polylines(ll, arrows = False):
         d = {
                 'path': [ { 'lat': lat, 'lng': lng } for lat, lng in l ],
                 'strokeColor': rgb2hex(c),
-                'strokeWeight': 2,
+                'strokeWeight': weight,
                 'strokeOpacity': 0.8,
                 }
         if arrows:
@@ -91,7 +91,7 @@ def weighted_lines(weights, endpoints, color_pos = '#00ff00', color_neg = '#ff00
                 'strokeWeight': int(10.0*w_rel),
                 }
 
-def line_sets(ll, arrows = False):
+def line_sets(ll, arrows = False, weight = 4):
     """
     ll = [
              [((lat, lon), (lat, lon)), ((lat, lon), (lat, lon))],
@@ -113,7 +113,7 @@ def line_sets(ll, arrows = False):
             d = {
                     'path': [ { 'lat': from_[0], 'lng': from_[1] }, { 'lat': to[0], 'lng': to[1] } ],
                     'strokeColor': rgb2hex(c),
-                    'strokeWeight': 4,
+                    'strokeWeight': weight,
                     'strokeOpacity': 0.5,
                   }
             if arrows:
