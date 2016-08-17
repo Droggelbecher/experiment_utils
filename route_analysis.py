@@ -61,6 +61,7 @@ class Routes:
             deptime = origin.get('t', None)
 
             if deptime is not None:
+                deptime = float(deptime)
                 dt = datetime.utcfromtimestamp(deptime)
                 self.F.day_of_week.encode(X[i, :], dt.weekday())
                 self.F.hour_of_day.encode(X[i, :], dt.hour)
