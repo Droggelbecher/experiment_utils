@@ -26,7 +26,10 @@ class Routes:
             len_tracks += 1
             for arc in track['track']:
                 ids.add(arc['roadid'])
-        sorted_road_ids = sorted(ids)
+
+        ids.remove(None)
+        sorted_road_ids = sorted(ids) + [None]
+
         id_to_idx = { v: i for i, v in enumerate(sorted_road_ids) }
 
         self.F = Features(
@@ -77,11 +80,14 @@ class Routes:
                     a_ids[id] = 1.0
                 self.F.route.encode(X, a_ids)
 
+        id_to_point_pair2 = dict(id_to_point_pair)
+        id_to_point_pair2[None] = ((0.0, 0.0), (0.0, 0.0))
+
         self.id_to_point_pair = id_to_point_pair
         self.len_tracks = len_tracks
         self.id_to_idx = id_to_idx
         self.idx_to_id = sorted_road_ids
-        self.idx_to_point_pairs = [id_to_point_pair[x] for x in sorted_road_ids if x in id_to_point_pair]
+        self.idx_to_point_pairs = [id_to_point_pair2[x] for x in sorted_road_ids]
         #self._routes = tracks
         self._X = X
         self.track_reader = track_reader

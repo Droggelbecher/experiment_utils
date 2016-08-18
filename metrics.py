@@ -58,5 +58,12 @@ def geo(*args):
 
     c = (math.sin(phi1) * math.sin(phi2) * math.cos(theta1 - theta2) + math.cos(phi1) * math.cos(phi2))
 
-    return 6373000.0 * math.acos(c)
+    if c >= 1.0:
+        acos = 0.0
+    elif c <= -1.0:
+        acos = math.pi
+    else:
+        acos = math.acos(c)
+
+    return 6373000.0 * acos
 
