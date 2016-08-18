@@ -91,6 +91,28 @@ def weighted_lines(weights, endpoints, color_pos = '#00ff00', color_neg = '#ff00
                 'strokeWeight': int(10.0*w_rel),
                 }
 
+def weighted_lines_cm(weights, endpoints, color_pos = '#00ff00', color_neg = '#ff0000', opacity = 0.5):
+    min_weight = min(weights)
+    max_weight = max(weights)
+
+    cm = plt.cm.cool
+
+    for w, (from_, to) in zip(weights, endpoints):
+        w_rel = 0
+        if w > 0:
+            w_rel = w / max_weight
+        elif min_weight < 0:
+            w_rel = w / min_weight
+
+        color = cm(w_rel)
+
+        yield {
+                'path': [ { 'lat': from_[0], 'lng': from_[1] }, { 'lat': to[0], 'lng': to[1] } ],
+                'strokeColor': rgb2hex(color),
+                'strokeOpacity': opacity,
+                'strokeWeight': 5,
+                }
+
 def line_sets(ll, arrows = False, weight = 4):
     """
     ll = [
