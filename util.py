@@ -19,3 +19,11 @@ def quantize(v, q):
         return -1 if v < 0 else 1
 
     return q * round(v / float(q))
+
+def compose1(*fns):
+    def f(x):
+        for fn in fns:
+            x = fn(x)
+        return x
+    return f
+
