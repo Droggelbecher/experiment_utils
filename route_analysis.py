@@ -80,6 +80,8 @@ class Routes:
         self.id_to_point_pair = id_to_point_pair
         self.len_tracks = len_tracks
         self.id_to_idx = id_to_idx
+        self.idx_to_id = sorted_road_ids
+        self.idx_to_point_pairs = [id_to_point_pair[x] for x in sorted_road_ids if x in id_to_point_pair]
         #self._routes = tracks
         self._X = X
         self.track_reader = track_reader
