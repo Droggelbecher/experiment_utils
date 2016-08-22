@@ -51,8 +51,10 @@ class Routes:
         for i, track in enumerate(track_reader()):
             id_to_point_pair = merge_arc_coordinates( id_to_point_pair, extract_arc_coordinates(track) )
 
+            logging.debug('route #{}: {}'.format(i, track['name']))
+
             if i % 10 == 0:
-                logging.debug('{:4d}/{:4d} tracks read'.format(i, len_tracks))
+                logging.info('{:4d}/{:4d} tracks read'.format(i, len_tracks))
 
             origin = track['track'][0]
             destination = track['track'][-1]

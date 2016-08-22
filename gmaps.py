@@ -71,7 +71,8 @@ def polylines(ll, arrows = False, weight = 2):
             d.update({ '_ARROW': True })
         yield d
 
-def weighted_lines(weights, endpoints, color_pos = '#00ff00', color_neg = '#ff0000', opacity = 0.5):
+def weighted_lines(weights, endpoints, color_pos = '#00ff00', color_neg = '#ff0000', opacity = 0.5,
+                  arrows = False):
     min_weight = min(weights)
     max_weight = max(weights)
 
@@ -84,14 +85,18 @@ def weighted_lines(weights, endpoints, color_pos = '#00ff00', color_neg = '#ff00
             w_rel = w / min_weight
             color = color_neg
 
-        yield {
+        d= {
                 'path': [ { 'lat': from_[0], 'lng': from_[1] }, { 'lat': to[0], 'lng': to[1] } ],
                 'strokeColor': color,
                 'strokeOpacity': opacity,
                 'strokeWeight': int(10.0*w_rel),
                 }
+        if arrows:
+            d.update({ '_ARROW': True })
+        yield d
 
-def weighted_lines_cm(weights, endpoints, color_pos = '#00ff00', color_neg = '#ff0000', opacity = 0.5):
+def weighted_lines_cm(weights, endpoints, color_pos = '#00ff00', color_neg = '#ff0000', opacity = 0.5,
+                     arrows = False, weight = 4):
     min_weight = min(weights)
     max_weight = max(weights)
 
@@ -106,12 +111,15 @@ def weighted_lines_cm(weights, endpoints, color_pos = '#00ff00', color_neg = '#f
 
         color = cm(w_rel)
 
-        yield {
+        d = {
                 'path': [ { 'lat': from_[0], 'lng': from_[1] }, { 'lat': to[0], 'lng': to[1] } ],
                 'strokeColor': rgb2hex(color),
                 'strokeOpacity': opacity,
-                'strokeWeight': 5,
+                'strokeWeight': weight,
                 }
+        if arrows:
+            d.update({ '_ARROW': True })
+        yield d
 
 def line_sets(ll, arrows = False, weight = 4):
     """
