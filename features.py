@@ -105,9 +105,14 @@ class Features:
         return getattr(self, fname)
 
     def get_features(self, names):
+        not_found = set(names)
+
         for f in self.features:
             if f.name in names:
+                not_found.remove(f.name)
                 yield f
+
+        assert len(not_found) == 0, 'features not found: {}'.format(not_found)
 
     def get_keys(self, featurenames):
         r = []
