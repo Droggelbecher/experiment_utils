@@ -137,7 +137,7 @@ def all_relations(a, filename, labels = None):
     plt.close(f)
 
 def relation(xs, ys, filename, xlabel=None, ylabel=None, pointlabels = [],
-        xlim = None):
+        xlim = None, xlog = False):
     xsl = list(xs)
     ysl = list(ys)
 
@@ -155,6 +155,9 @@ def relation(xs, ys, filename, xlabel=None, ylabel=None, pointlabels = [],
 
     if xlim is not None:
         ax.set_xlim(xlim)
+
+    if xlog:
+        ax.set_xscale('log')
 
     if pointlabels:
         for x, y, l in zip(xsl, ysl, pointlabels):
