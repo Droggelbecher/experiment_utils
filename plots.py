@@ -137,7 +137,7 @@ def all_relations(a, filename, labels = None):
     plt.close(f)
 
 def relation(xs, ys, filename, xlabel=None, ylabel=None, pointlabels = [],
-        xlim = None, xlog = False):
+        xlim = None, xlog = False, vertical_line = None):
     xsl = list(xs)
     ysl = list(ys)
 
@@ -162,6 +162,9 @@ def relation(xs, ys, filename, xlabel=None, ylabel=None, pointlabels = [],
     if pointlabels:
         for x, y, l in zip(xsl, ysl, pointlabels):
             ax.text(x, y, l, transform = trans_offset, fontsize=8)
+
+    if vertical_line:
+        ax.axvline(vertical_line, color='red')
 
     ax.grid(True)
 
