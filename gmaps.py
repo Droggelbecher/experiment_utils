@@ -157,6 +157,8 @@ def generate_gmaps(
         markers = [],
         heatmap = [],
         circles = [],
+        invalid_markers = [],
+        styled_markers = [],
         center = (52.495372, 13.461614),
         info = [],
         default_color = '#000000',
@@ -170,14 +172,28 @@ def generate_gmaps(
     # Markers
     #
 
+    # "Normal" markers
     ms = []
     for i, m in enumerate(markers):
         d = m
         if isinstance(m, tuple) or isinstance(m, np.ndarray):
             # just a coordinate
             d = { 'position': { 'lat': m[0], 'lng': m[1] }, 'title': '#{}'.format(i) }
-        ms.append(d)
-    s_markers = ',\n'.join('new google.maps.Marker({})'.format(json.dumps(m)) for m in ms)
+        ms.append(json.dumps(d))
+
+    # "Invalid" markers
+    for i, m in enumerate(invalid_markers):
+        s = '{{ "position": {{ "lat": {}, "lng": {} }}, "icon": marker_invalid }}'.format(m[0], m[1])
+        ms.append(s)
+
+    # "styled" markers
+
+    for i, mm in enumerate(styled_markers):
+        for m in mm:
+            s = '{{ "position": {{ "lat": {}, "lng": {} }}, "icon": markers_styled[{} % markers_styled.length] }}'.format(m[0], m[1], i)
+            ms.append(s)
+
+    s_markers = ',\n'.join('new google.maps.Marker({})'.format(m) for m in ms)
 
 
     #
@@ -219,6 +235,83 @@ def generate_gmaps(
 <script>
 
 var center = new google.maps.LatLng({}, {});
+
+var marker_invalid = {{
+    path: 'M -1,-1 L 1,1 z M -1,1 L 1,-1',
+    strokeOpacity: 0.5,
+    strokeColor: 'grey',
+    strokeWeight: 2,
+    scale: 5
+}};
+
+var markers_styled_path = 'M -.6,.5 0,-.5 .6,.5 z';
+var markers_styled = [
+{{
+    path: markers_styled_path,
+    strokeOpacity: 0.5,
+    strokeWeight: 2,
+    strokeColor: 'green',
+    scale: 10
+}},
+{{
+    path: markers_styled_path,
+    strokeOpacity: 0.5,
+    strokeWeight: 2,
+    strokeColor: 'magenta',
+    scale: 10
+}},
+{{
+    path: markers_styled_path,
+    strokeOpacity: 0.5,
+    strokeWeight: 2,
+    strokeColor: 'cyan',
+    scale: 10
+}},
+{{
+    path: markers_styled_path,
+    strokeOpacity: 0.5,
+    strokeWeight: 2,
+    strokeColor: 'orange',
+    scale: 10
+}},
+{{
+    path: markers_styled_path,
+    strokeOpacity: 0.5,
+    strokeWeight: 2,
+    strokeColor: 'blue',
+    scale: 10
+}},
+{{
+    path: markers_styled_path,
+    strokeOpacity: 0.5,
+    strokeWeight: 2,
+    strokeColor: 'black',
+    scale: 10
+}},
+{{
+    path: markers_styled_path,
+    strokeOpacity: 0.5,
+    strokeWeight: 2,
+    strokeColor: 'red',
+    scale: 10
+}},
+{{
+    path: markers_styled_path,
+    strokeOpacity: 0.5,
+    strokeWeight: 2,
+    strokeColor: 'brown',
+    scale: 10
+}},
+{{
+    path: markers_styled_path,
+    strokeOpacity: 0.5,
+    strokeWeight: 2,
+    strokeColor: 'teal',
+    scale: 10
+}}
+
+];
+
 
 var lines = [
     {}
