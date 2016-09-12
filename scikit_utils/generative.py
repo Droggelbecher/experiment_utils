@@ -15,7 +15,7 @@ class GenerativeClassifier(BaseEstimator, ClassifierMixin):
         self.classes_ = np.unique(y)
 
         for c in self.classes_:
-            grid = GridSearchCV(KernelDensity(kernel='gaussian'), {'bandwidth': np.logspace(-1, 2, 20)})
+            grid = GridSearchCV(KernelDensity(kernel='gaussian'), {'bandwidth': np.logspace(-2, 1, 20)})
             grid.fit(X[y == c])
             estimator = grid.best_estimator_
             logging.debug('cls {} bandwidth {}'.format(c, estimator.bandwidth))
