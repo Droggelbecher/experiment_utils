@@ -146,7 +146,7 @@ class Features:
 
     def all_except(self, featname, a):
         f = getattr(self, featname)
-        return np.hstack((a[:f.start], a[f.end:]))
+        return np.hstack((a[...,:f.start], a[...,f.end:]))
 
 class Feature:
     keys = ('value',)

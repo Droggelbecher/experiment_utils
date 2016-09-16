@@ -24,6 +24,11 @@ def unique(list_):
     return list(OrderedDict.fromkeys(list_))
 
 def flatten(list_):
+    """
+    >>> l = [ [ [ 1, 2 ], [ 3, [ 4, 5, 6 ] ], [], [ [ [ ] ] ], 7 ], 8 ]
+    >>> flatten(l)
+    [1, 2, 3, 4, 5, 6, 7, 8]
+    """
     r = []
     for item in list_:
         if type(item) in (tuple, list):
@@ -33,10 +38,30 @@ def flatten(list_):
     return r
 
 def repeat_to(l, n):
+    """
+    >>> repeat_to([1, 2, 3], 10)
+    (1, 2, 3, 1, 2, 3, 1, 2, 3, 1)
+    """
     return tuple(itertools.islice(itertools.cycle(l), n))
 
 
 class CV:
+
+    """
+    >>> n = 78
+    >>> parts = 10
+    >>> cv = CV(n, parts)
+    >>> l = list(cv)
+    >>> len(l) == parts
+    True
+    >>> l[0][0] == 0
+    True
+    >>> l[-1][1] == n
+    True
+    >>> l
+    [(0, 8), (8, 16), (16, 24), (24, 32), (32, 40), (40, 48), (48, 56), (56, 64), (64, 72), (72, 78)]
+    """
+
     def __init__(self, n, parts):
         self.n = n
         self.parts = parts
