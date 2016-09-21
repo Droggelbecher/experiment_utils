@@ -1,6 +1,10 @@
 
 import numpy as np
 
+def shuffle_rows(*args):
+    a = np.arange(args[0].shape[0])
+    return [np.array(arg)[a] for arg in args]
+
 def sparsly(a):
     s = 'ar[\n  shape: {}\n'.format(a.shape)
 
