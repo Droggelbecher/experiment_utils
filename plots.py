@@ -94,7 +94,7 @@ def fill_between_steps(ax, x, y1, y2=0, step_where='pre', **kwargs):
 
 
 
-def all_relations(a, filename, labels = None, classes = None, figsize = None, lim = None):
+def all_relations(a, filename, labels = None, classes = None, figsize = None, lim = None, colormap = plt.cm.Paired):
     """
     a: np array, rows for data, columns for features/axes
     """
@@ -112,7 +112,7 @@ def all_relations(a, filename, labels = None, classes = None, figsize = None, li
         labels = [str(x) for x in range(features)]
 
     if classes is not None:
-        cm = plt.cm.Paired(np.linspace(0, 1, len(np.unique(classes)))) #plt.cm.Set1(len(classes))
+        cm = colormap(np.linspace(0, 1, len(np.unique(classes)))) #plt.cm.Set1(len(classes))
 
     #if not shapeclasses:
         #shapeclasses = np.zeros(a.shape[0])
@@ -122,6 +122,7 @@ def all_relations(a, filename, labels = None, classes = None, figsize = None, li
     for row in range(1, features):
         for column in range(features - 1):
             ax = axs[row - 1, column]
+            #ax.tick_params(labeltop=False, labelright=False)
 
             if column < row:
                 if classes is not None:
@@ -146,10 +147,14 @@ def all_relations(a, filename, labels = None, classes = None, figsize = None, li
 
                 else:
                     if len(a[:,column]):
-                        ax.set_xlim((np.min(a[:,column]), np.max(a[:,column])))
+                        min_, max_ = np.min(a[:,column]), np.max(a[:,column])
+                        eps = (max_ - min_) * 0.1
+                        ax.set_xlim((min_ - eps, max_ + eps))
 
                     if len(a[:,row]):
-                        ax.set_ylim((np.min(a[:,row]), np.max(a[:,row])))
+                        min_, max_ = np.min(a[:,row]), np.max(a[:,row])
+                        eps = (max_ - min_) * 0.1
+                        ax.set_ylim((min_ - eps, max_ + eps))
             else:
                 ax.axis('off')
 
@@ -462,7 +467,7 @@ def boxplots(xs, yss, filename):
 
     plt.savefig(filename, dpi=100, bbox_inches='tight')
 
-def multi_boxplots(xs, ysss, filename, ylim = (-0.05, 1.05), labels = [], toplabels = [], points = True, xlabel = '', ylabel = '', legendrows = 2, cm = plt.cm.Dark2):
+def multi_boxplots(xs, ysss, filename, ylim = (-0.05, 1.05), labels = [], toplabels = [], points = True, xlabel = '', ylabel = '', legendrows = 2, cm = plt.cm.Dark2, showfliers = False):
     """
     ysss = [
             [ [ x x x x ], ... ],
@@ -480,6 +485,9 @@ def multi_boxplots(xs, ysss, filename, ylim = (-0.05, 1.05), labels = [], toplab
     innermost list = data for 1 box
     list of boxlists = data row (same color)
     """
+
+    #dot_spread = 0.1
+    dot_spread = 0.6
 
     fig, axes = plt.subplots(1, 1, figsize=(14, 7))
 
@@ -522,10 +530,12 @@ def multi_boxplots(xs, ysss, filename, ylim = (-0.05, 1.05), labels = [], toplab
 
         if len(yss):
             bp = axes.boxplot(yss,
-                    vert = True,
-                    boxprops={'color': c},
-                    widths = 0.6,
-                    positions = ps)
+                              vert = True,
+                              boxprops={'color': c},
+                              widths = 0.6,
+                              positions = ps,
+                              notch = True,
+                              showfliers = showfliers)
 
             # Style the box
             for key, v in bp.items():
@@ -538,7 +548,9 @@ def multi_boxplots(xs, ysss, filename, ylim = (-0.05, 1.05), labels = [], toplab
 
 
         for ys, p in zip(yss, ps):
-            rxs = np.random.normal(p, 0.06, size = len(ys))
+            #rxs = np.linspace(p - dot_spread / 2, p + dot_spread / 2, len(ys))
+            rxs = np.random.uniform(p - dot_spread / 2, p + dot_spread / 2, size = len(ys))
+            #rxs = np.random.normal(p, dot_spread, size = len(ys))
             plt.plot(rxs, ys, '.', c = c, alpha = 0.5)
 
 
