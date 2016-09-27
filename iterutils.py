@@ -66,6 +66,7 @@ class CV:
         self.n = n
         self.parts = parts
         self._sz = int(math.ceil(n / float(parts)))
+        assert self._sz >= 1
 
     def __iter__(self):
 

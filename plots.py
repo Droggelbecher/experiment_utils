@@ -94,7 +94,7 @@ def fill_between_steps(ax, x, y1, y2=0, step_where='pre', **kwargs):
 
 
 
-def all_relations(a, filename, labels = None):
+def all_relations(a, filename, labels = None, classes = None, figsize = None, lim = None):
     """
     a: np array, rows for data, columns for features/axes
     """
@@ -103,31 +103,55 @@ def all_relations(a, filename, labels = None):
     features = a.shape[1]
     f, axs = plt.subplots(features - 1, features - 1, squeeze=False) #, sharex=True, sharey=True)
 
+    classes = np.array(classes)
+
+    if figsize is not None:
+        f.set_size_inches(figsize)
+
     if labels is None:
         labels = [str(x) for x in range(features)]
 
+    if classes is not None:
+        cm = plt.cm.Paired(np.linspace(0, 1, len(np.unique(classes)))) #plt.cm.Set1(len(classes))
+
+    #if not shapeclasses:
+        #shapeclasses = np.zeros(a.shape[0])
+
+    shapes = ['^', 'o', 's', 'x']
+
     for row in range(1, features):
         for column in range(features - 1):
+            ax = axs[row - 1, column]
+
             if column < row:
-                axs[row - 1, column].scatter(a[:,column], a[:,row], alpha = 0.5, c=np.arange(a.shape[0]))
+                if classes is not None:
+                    logging.debug(classes.dtype)
+                    ax.scatter(a[:,column], a[:,row], alpha = 0.2, c=cm[classes])
+                else:
+                    ax.scatter(a[:,column], a[:,row], alpha = 0.2, c=np.arange(a.shape[0]))
 
                 if column > 0:
-                    axs[row - 1, column].get_yaxis().set_ticks([])
+                    ax.get_yaxis().set_ticks([])
                 else:
-                    axs[row - 1, column].set_ylabel(labels[row])
+                    ax.set_ylabel(labels[row])
 
                 if row < features - 1: 
-                    axs[row - 1, column].get_xaxis().set_ticks([])
+                    ax.get_xaxis().set_ticks([])
                 else:
-                    axs[row - 1, column].set_xlabel(labels[column])
+                    ax.set_xlabel(labels[column])
 
-                if len(a[:,column]):
-                    axs[row - 1, column].set_xlim((np.min(a[:,column]), np.max(a[:,column])))
+                if lim:
+                    ax.set_xlim(lim)
+                    ax.set_ylim(lim)
 
-                if len(a[:,row]):
-                    axs[row - 1, column].set_ylim((np.min(a[:,row]), np.max(a[:,row])))
+                else:
+                    if len(a[:,column]):
+                        ax.set_xlim((np.min(a[:,column]), np.max(a[:,column])))
+
+                    if len(a[:,row]):
+                        ax.set_ylim((np.min(a[:,row]), np.max(a[:,row])))
             else:
-                axs[row - 1, column].axis('off')
+                ax.axis('off')
 
 
     #plt.autoscale()
