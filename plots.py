@@ -534,7 +534,7 @@ def multi_boxplots(xs, ysss, filename, ylim = (-0.05, 1.05), labels = [], toplab
                               boxprops={'color': c},
                               widths = 0.6,
                               positions = ps,
-                              notch = True,
+                              #notch = True, # crashes w/ empty plots, so no notch :(
                               showfliers = showfliers)
 
             # Style the box
