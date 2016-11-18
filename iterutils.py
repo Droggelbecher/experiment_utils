@@ -44,6 +44,69 @@ def repeat_to(l, n):
     """
     return tuple(itertools.islice(itertools.cycle(l), n))
 
+def neighbors(l):
+    """
+    >>> neighbors(list(range(10)))
+    [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7), (7, 8), (8, 9)]
+    """
+    return zip(l[:-1], l[1:])
+
+def cyc_neighbors(l):
+    """
+    >>> cyc_neighbors(list(range(10)))
+    [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7), (7, 8), (8, 9), (9, 0)]
+
+    >>> import numpy as np
+    >>> a = np.array(list(range(10)))
+    >>> cyc_neighbors(a)
+    array([[0, 1],
+           [1, 2],
+           [2, 3],
+           [3, 4],
+           [4, 5],
+           [5, 6],
+           [6, 7],
+           [7, 8],
+           [8, 9],
+           [9, 0]])
+    >>> aa = np.array((a, a)).T
+    >>> cyc_neighbors(aa)
+    array([[[0, 0],
+            [1, 1]],
+    <BLANKLINE>
+           [[1, 1],
+            [2, 2]],
+    <BLANKLINE>
+           [[2, 2],
+            [3, 3]],
+    <BLANKLINE>
+           [[3, 3],
+            [4, 4]],
+    <BLANKLINE>
+           [[4, 4],
+            [5, 5]],
+    <BLANKLINE>
+           [[5, 5],
+            [6, 6]],
+    <BLANKLINE>
+           [[6, 6],
+            [7, 7]],
+    <BLANKLINE>
+           [[7, 7],
+            [8, 8]],
+    <BLANKLINE>
+           [[8, 8],
+            [9, 9]],
+    <BLANKLINE>
+           [[9, 9],
+            [0, 0]]])
+
+    """
+    if isinstance(l, list):
+        return zip(l, l[1:] + l[:1])
+    else:
+        import numpy as np
+        return np.array(zip(l, np.roll(l, -1, axis = 0)))
 
 class CV:
 
