@@ -54,13 +54,13 @@ def mesh_cartesian(mesh, s):
         for m in mesh
     ]
 
-    print ('m0 sh', mesh[0].shape)
-    print ('s sh', s.shape)
-    print (np.repeat(
-            s.reshape(1, -1),
-            np.prod(mesh[0].shape),
-            0
-        ))
+    #print ('m0 sh', mesh[0].shape)
+    #print ('s sh', s.shape)
+    #print (np.repeat(
+            #s.reshape(1, -1),
+            #np.prod(mesh[0].shape),
+            #0
+        #))
 
     if len(s.shape) == 1:
         r.append(
@@ -120,4 +120,36 @@ def mesh_cartesian_seq(mesh, s):
 
 def all_onehot(n):
     return np.diag(np.ones(n))
+
+def coordinates_to_offsets(a):
+    """
+    >>> a = np.array([(1, 2), (5, 8), (10, 10)])
+    >>> origin, offsets = coordinates_to_offsets(a)
+    >>> origin
+    array([1, 2])
+    >>> offsets
+    array([[4, 6],
+           [5, 2]])
+    """
+    origin = a[0]
+    offsets = a[1:] - a[:-1]
+    return origin, offsets
+
+def offsets_to_coordinates(origin, offsets):
+    """
+    >>> origin = np.array([1, 2])
+    >>> offsets = np.array([(4, 6), (5, 2)])
+    >>> a = offsets_to_coordinates(origin, offsets)
+    >>> a
+    array([[ 1,  2],
+           [ 5,  8],
+           [10, 10]])
+    """
+
+    return np.concatenate((
+        np.array([origin]),
+        origin + np.cumsum(offsets, axis = 0)
+    ))
+
+
 
