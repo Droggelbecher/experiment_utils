@@ -16,11 +16,18 @@ class Outdir:
     def __init__(self, name = ''):
         now = datetime.now().strftime('%Y-%m-%d--%H-%M')
         self.path = os.path.abspath(
-            'out-' + (name + '-' if name else '') + now
+            os.path.join(
+                'out/',
+                (name + '-' if name else '') + now
             )
-        os.makedirs(self.path)
+        )
+
+    def create(self):
+        if not os.path.exists(self.path):
+            os.makedirs(self.path)
 
     def dump(self, filename, data):
+        self.create()
         with open(os.path.join(self.path, filename + '.json'), 'w') as f:
             json.dump(data, f, cls = DecimalEncoder)
 
