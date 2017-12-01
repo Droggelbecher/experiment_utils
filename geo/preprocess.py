@@ -2,6 +2,9 @@
 
 def smooth(trace, dt):
     """
+    Simple smoothing & resampling of trace using splines.
+    Not well-suited for noise or duplicates.
+
     trace: data frame with at least columns 't', 'lat', 'lon'
     dt: resampling time interval
     return: ???
@@ -28,6 +31,17 @@ def smooth(trace, dt):
     r.set_index('t', inplace=True)
 
     return r
+
+
+def drop_duplicates(trace):
+    """
+    Remove entries that only differ in column 't', except for first.
+
+    trace: data frame with at least column 't'
+    """
+    columns = set(trace.axes[1]) - set('t')
+    return trace.drop_duplicates(subset = columns)
+
 
 
 
