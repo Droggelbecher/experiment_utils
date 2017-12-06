@@ -1,5 +1,5 @@
 
-import metrics
+from . import metrics
 
 def add_t_uniformly(path, dt = 1.0):
     # TODO: copy path, add a 't' column with 0,dt,2dt,...
@@ -26,13 +26,21 @@ def smooth_regress(path, dt, order):
     # new ts sequence
     nt = start + np.linspace(0, end - start, (end - start) / dt + 1)
 
-    lat = np.poly1d(np.polyfit(path['t'], path['lat'], order))
-    lon = np.poly1d(np.polyfit(path['t'], path['lon'], order))
+    avg_t = np.mean(path['t'])
+    avg_lat = np.mean(path['lat'])
+    avg_lon = np.mean(path['lon'])
+
+    lat = np.poly1d(np.polyfit(path['t'] - avg_t, path['lat'] - avg_lat, order))
+    lon = np.poly1d(np.polyfit(path['t'] - avg_t, path['lon'] - avg_lon, order))
 
     r = pd.DataFrame(columns = ('t', 'lat', 'lon'))
     r['t'] = nt
-    r['lat'] = list(map(lat, nt))
-    r['lon'] = list(map(lon, nt))
+    r['lat'] = list(map(lat, nt - avg_t))
+    r['lon'] = list(map(lon, nt - avg_t))
+
+    # Repair path
+    r['lat'] += avg_lat
+    r['lon'] += avg_lon
     r.set_index('t', inplace=True)
 
     print("r=", r)
