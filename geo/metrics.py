@@ -8,11 +8,12 @@ def geo(pos1, pos2):
     pos1: Source coordinate (expected to have .lat & .lon)
     pos2: Target coordinate (expected to have .lat & .lon)
     """
+    import math
 
-    lat1 = pos1.lat
-    lon1 = pos1.lon
-    lat2 = pos2.lat
-    lon2 = pos2.lon
+    lat1 = float(pos1['lat'])
+    lon1 = float(pos1['lon'])
+    lat2 = float(pos2['lat'])
+    lon2 = float(pos2['lon'])
 
     if lat1 == lat2 and lon1 == lon2:
         return 0.0

@@ -1,15 +1,6 @@
 
 from . import metrics
 
-def add_t_uniformly(path, dt = 1.0):
-    # TODO: copy path, add a 't' column with 0,dt,2dt,...
-    pass
-
-def add_t_from_poly_distance(path, metric = metrics.geo):
-    # TODO: copy path, add a 't' column according to distance along polygon
-    pass
-
-
 def smooth_regress(path, dt, order):
     """
     path: data frame with at least columns 't', 'lat', 'lon'
@@ -43,7 +34,6 @@ def smooth_regress(path, dt, order):
     r['lon'] += avg_lon
     r.set_index('t', inplace=True)
 
-    print("r=", r)
     return r
 
 

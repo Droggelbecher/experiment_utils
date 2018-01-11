@@ -1,6 +1,7 @@
 
 from plot import plot_trace_points, plot_trace_path
 from preprocess import smooth_spline, smooth_regress
+from kalman import kalman_filter
 
 import pandas as pd
 
@@ -10,7 +11,8 @@ if __name__ == '__main__':
     df = pd.DataFrame(data = { 't': [1, 2, 3, 4, 5], 'lat': [10, 12, 10, 9, 8], 'lon': [100, 99, 98, 95, 97] })
     df2 = smooth_spline(df, 0.1)
     df3 = smooth_regress(df, 0.1, 4)
-    df4 = smooth_regress(df, 0.1, 3)
+    #df4 = smooth_regress(df, 0.1, 3)
+    df4 = kalman_filter(df, 0.1)
 
     p = ggplot(aes(x='lat', y='lon'), data=pd.DataFrame(columns=('lat', 'lon'), data={}))
 
