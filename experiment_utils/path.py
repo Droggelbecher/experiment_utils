@@ -1,0 +1,55 @@
+
+from typing import Sequence, Iterable, Union, Sequence, Callable
+
+import sys
+# Hack to fix "typing_extensions not found" on OSX when running this with anything other than mypy
+sys.path.extend([
+    "/usr/local/Cellar/mypy/0.560_1/libexec/lib/python3.6/site-packages",
+    "/usr/local/Cellar/mypy/0.560_1/libexec/vendor/lib/python3.6/site-packages"
+    ])
+from typing_extensions import Protocol
+
+import numpy as np
+
+class Point(Protocol):
+    x : float
+    y : float
+Path = Sequence[Point]
+
+class TimedPoint(Point):
+    t : float
+TimedPath = Sequence[TimedPoint]
+
+
+def bernstein(n, k):
+    """
+    Return a function bpoly(x) that is the bernstein polynomial for (n, k)
+    """
+    from scipy.special import binom
+    coeff = binom(n, k)
+    return lambda x: coeff * x**k * (1 - x)**(n - k)
+
+def bezier(path : Path):
+    """
+    path: Path to interpolate
+
+    >>> path = [ (0, 0), (1, 1), (5, 1), (6, 2) ]
+    >>> f = bezier(path)
+    >>> f(0)
+    array([[0., 0.]])
+    >>> f([0, 1])
+    array([[0., 0.],
+           [6., 2.]])
+    """
+    path = np.array(path)
+    n = len(path)
+
+    def f(t):
+        t = np.array(t)
+        a = sum(
+            np.outer(bernstein(n - 1 , i)(t), p)
+            for i, p in enumerate(path)
+        )
+        return a
+    return f
+

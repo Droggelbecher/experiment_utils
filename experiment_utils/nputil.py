@@ -1,6 +1,17 @@
 
 import numpy as np
 
+def np_moving_average(a, n=3) :
+    """
+    Moving average of width n (entries) on a numpy array.
+    source: http://stackoverflow.com/questions/14313510/moving-average-function-on-numpy-scipy
+    """
+    ret = np.cumsum(a, dtype=float)
+    ret[n:] = (ret[n:] - ret[:-n]) / n
+    ret[:n] = ret[:n] / (np.arange(n) + 1)
+    return ret
+
+
 def shuffle_rows(*args):
     """
     Given a number of lists/tuples/NP-arrays, return consistently row-shuffled
@@ -38,8 +49,11 @@ def shuffle_rows(*args):
     return [np.array(arg)[a] for arg in args]
 
 def sparsly(a):
+    """
+    Return a string representation of a (for printing),
+    that only lists non-zero fields.
+    """
     s = 'ar[\n  shape: {}\n'.format(a.shape)
-
     idxs = np.where(a != 0)
     for t in zip(*idxs):
         s += '  {} = {}\n'.format(t, a[t])
@@ -200,10 +214,20 @@ def mesh_cartesian(mesh, s):
 
 
 def all_onehot(n):
+    """
+    Return a numpy array of all n possible one-hot configurations
+    with n fields. (That is, the nxn matrix with all 1s on the diagonal
+    """
     return np.diag(np.ones(n))
 
 def coordinates_to_offsets(a):
     """
+    Given an array a that represents a sequence of positions,
+    return its delta-encoding, that is its origin (a[0]) and a sequence of
+    offsets (each relative to the previous offset or the origin).
+
+    Return: Pair (origin, offsets)
+
     >>> a = np.array([(1, 2), (5, 8), (10, 10)])
     >>> origin, offsets = coordinates_to_offsets(a)
     >>> origin
@@ -218,6 +242,8 @@ def coordinates_to_offsets(a):
 
 def offsets_to_coordinates(origin, offsets):
     """
+    Inverse operation of coordinates_to_offsets()
+
     >>> origin = np.array([1, 2])
     >>> offsets = np.array([(4, 6), (5, 2)])
     >>> a = offsets_to_coordinates(origin, offsets)

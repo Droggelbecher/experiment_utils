@@ -1,35 +1,15 @@
 
 import math
 import itertools
+from typing import Sequence, Any, Tuple, Iterable, List
 
-def chunks(list_, n):
-    """
-    Split list-like list_ into n equally sized chunks (the last one may be
-    smaller).
-
-    >>> l = list(range(10, 75))
-    >>> list( chunks(l, 7) )
-    [[10, 11, 12, 13, 14, 15, 16, 17, 18, 19], [20, 21, 22, 23, 24, 25, 26, 27, 28, 29], [30, 31, 32, 33, 34, 35, 36, 37, 38, 39], [40, 41, 42, 43, 44, 45, 46, 47, 48, 49], [50, 51, 52, 53, 54, 55, 56, 57, 58, 59], [60, 61, 62, 63, 64, 65, 66, 67, 68, 69], [70, 71, 72, 73, 74]]
-    """
-
-    sz = int(math.ceil(len(list_) / float(n)))
-    for i in range(0, len(list_), sz):
-        yield list_[i:i + sz]
-
-
-def unique(list_):
-
-    from collections import OrderedDict
-
-    return list(OrderedDict.fromkeys(list_))
-
-def flatten(list_):
+def flatten(list_: Iterable[Any]) -> List[Any]:
     """
     >>> l = [ [ [ 1, 2 ], [ 3, [ 4, 5, 6 ] ], [], [ [ [ ] ] ], 7 ], 8 ]
     >>> flatten(l)
     [1, 2, 3, 4, 5, 6, 7, 8]
     """
-    r = []
+    r: List[Sequence[Any]] = []
     for item in list_:
         if type(item) in (tuple, list):
             r.extend(flatten(item))
@@ -37,23 +17,23 @@ def flatten(list_):
             r.append(item)
     return r
 
-def repeat_to(l, n):
+def repeat_to(l: Iterable[Any], n: int) -> Tuple[Any, ...]:
     """
     >>> repeat_to([1, 2, 3], 10)
     (1, 2, 3, 1, 2, 3, 1, 2, 3, 1)
     """
     return tuple(itertools.islice(itertools.cycle(l), n))
 
-def neighbors(l):
+def neighbors(l: Sequence[Any]) -> Iterable[Tuple[Any, Any]]:
     """
-    >>> neighbors(list(range(10)))
+    >>> list( neighbors(list(range(10))) )
     [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7), (7, 8), (8, 9)]
     """
     return zip(l[:-1], l[1:])
 
 def cyc_neighbors(l):
     """
-    >>> cyc_neighbors(list(range(10)))
+    >>> list( cyc_neighbors(list(range(10))) )
     [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7), (7, 8), (8, 9), (9, 0)]
 
     >>> import numpy as np
@@ -106,11 +86,12 @@ def cyc_neighbors(l):
         return zip(l, l[1:] + l[:1])
     else:
         import numpy as np
-        return np.array(zip(l, np.roll(l, -1, axis = 0)))
+        return np.array(list(zip(l, np.roll(l, -1, axis = 0))))
 
 class CV:
-
     """
+    Yield cross-validation ranges.
+
     >>> n = 78
     >>> parts = 10
     >>> cv = CV(n, parts)
