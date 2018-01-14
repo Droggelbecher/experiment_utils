@@ -1,6 +1,4 @@
 
-from . import metrics
-
 def smooth_regress(path, dt, order):
     """
     path: data frame with at least columns 't', 'lat', 'lon'
