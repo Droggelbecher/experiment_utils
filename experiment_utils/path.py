@@ -1,5 +1,7 @@
 
-from typing import Sequence, Iterable, Union, Sequence, Callable
+from typing import Sequence, Iterable, Union, Sequence, Callable, Any
+from collections import namedtuple
+import numpy as np
 
 import sys
 # Hack to fix "typing_extensions not found" on OSX when running this with anything other than mypy
@@ -9,7 +11,8 @@ sys.path.extend([
     ])
 from typing_extensions import Protocol
 
-import numpy as np
+from .conversions import make_like
+
 
 class Point(Protocol):
     x : float
@@ -21,15 +24,18 @@ class TimedPoint(Point):
 TimedPath = Sequence[TimedPoint]
 
 
-def bernstein(n, k):
+def bernstein(n: int, k: int):
     """
     Return a function bpoly(x) that is the bernstein polynomial for (n, k)
     """
     from scipy.special import binom
     coeff = binom(n, k)
-    return lambda x: coeff * x**k * (1 - x)**(n - k)
+    def bpoly(x):
+        r = coeff * x**k * (1 - x)**(n - k)
+        return r
+    return bpoly
 
-def bezier(path : Path):
+def bezier(path: Sequence[Any]):
     """
     path: Path to interpolate
 
@@ -41,15 +47,15 @@ def bezier(path : Path):
     array([[0., 0.],
            [6., 2.]])
     """
-    path = np.array(path)
     n = len(path)
+    path1 = np.array(path)
 
     def f(t):
         t = np.array(t)
         a = sum(
-            np.outer(bernstein(n - 1 , i)(t), p)
-            for i, p in enumerate(path)
+            np.outer(bernstein(n - 1, i)(t), p)
+            for i, p in enumerate(path1)
         )
-        return a
+        return make_like(path, a)
     return f
 

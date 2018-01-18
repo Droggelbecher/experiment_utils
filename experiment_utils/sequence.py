@@ -1,6 +1,6 @@
 
 import math
-from typing import Sequence, Any, Iterable, List, Generator
+from typing import Sequence, Any, Iterable, List, Generator, Callable
 import itertools
 
 def align(l1: Sequence[Any], l2: Sequence[Any]) -> Iterable[Any]:
@@ -53,4 +53,39 @@ def chunks(list_: Sequence[Any], n: int) -> Generator[Sequence[Any], None, None]
 def unique(list_: Iterable[Any]) -> List[Any]:
     from collections import OrderedDict
     return list(OrderedDict.fromkeys(list_)) # type: ignore
+
+def dtw(seq1: Sequence[Any], seq2: Sequence[Any], distance: Callable[[Any, Any], float], w: int = math.inf):
+
+    """
+    Return the dynamic time warping distance between two sequnces,
+    using the given element-wise distance metric.
+
+    >>> seq1 = [1, 2, 3, 4, 5]
+    >>> seq2 = [1, 2, 2, 3, 3, 4, 5]
+    >>> dtw(seq1, seq2, distance = lambda a, b: abs(a - b))
+    0.0
+    """
+    import numpy as np
+
+    n = len(seq1)
+    m = len(seq2)
+
+    dtw = np.zeros((n + 1, m + 1))
+    dtw[:, :] = np.inf
+    dtw[0, 0] = 0
+
+    w = max(w, abs(n - m))
+
+    for i, p1 in enumerate(seq1):
+        for j in range(max(0, i - w), min(m, i + w)):
+            p2 = seq2[j]
+            cost = distance(p1, p2)
+            dtw[i + 1, j + 1] = cost + min(
+                dtw[i, j + 1],  # insertion
+                dtw[i + 1, j],  # deletion
+                dtw[i, j] # match
+                )
+
+    r = dtw[n, m]
+    return r
 

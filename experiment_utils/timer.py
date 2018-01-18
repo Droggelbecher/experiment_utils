@@ -4,6 +4,8 @@ import time
 from collections import namedtuple, defaultdict
 from typing import List, Tuple
 
+from .text import format_table
+
 class Timer:
     """
     TODO: get_stats() probably doesn't handle recursive functions incorrectly currently
@@ -56,6 +58,11 @@ class Timer:
                 stack.pop()
         assert not len(stack)
 
+    @classmethod
+    def format_stats(cls, stats = None):
+        if stats is None:
+            stats = tuple(cls.get_stats())
+        return format_table(stats, ('name', 'tot', 'calls'))
 
     @classmethod
     def get_stats(cls):

@@ -2,7 +2,6 @@
 from collections import OrderedDict
 import logging
 
-# TODO
 try:
     import ijson.backends.yajl2_cffi as ijson
     logging.info("using yajl2/cffi parser :-)")
@@ -107,7 +106,7 @@ class IjsonParser:
     def send(self, event, value):
         yield from getattr(self.top_parser(), 'on_' + event)(value)
 
-    def parse_all(self):
+    def parse_all(self, allow_skip = False):
         if self.top_parser() is not self:
             assert False, (self.top_parser(), self)
         for event, value in self.lexer:
@@ -116,7 +115,10 @@ class IjsonParser:
                     if source is self:
                         yield r
                     else:
-                        print("ignoring {} from {} (self={})".format(r, source, self))
+                        if not allow_skip:
+                            raise UserWarning('ignoring {} from {} (self={})'.format(r, source, self))
+                        else:
+                            print("ignoring {} from {} (self={})".format(r, source, self))
             except InterruptParsing as e:
                 if e.popped_parser is self:
                     break
