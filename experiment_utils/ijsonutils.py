@@ -117,8 +117,8 @@ class IjsonParser:
                     else:
                         if not allow_skip:
                             raise UserWarning('ignoring {} from {} (self={})'.format(r, source, self))
-                        else:
-                            print("ignoring {} from {} (self={})".format(r, source, self))
+                        #else:
+                            #print("ignoring {} from {} (self={})".format(r, source, self))
             except InterruptParsing as e:
                 if e.popped_parser is self:
                     break
