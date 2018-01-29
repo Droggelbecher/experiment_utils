@@ -67,6 +67,9 @@ def dtw(seq1: Sequence[Any], seq2: Sequence[Any], distance: Callable[[Any, Any],
     """
     import numpy as np
 
+    assert np.all(np.isfinite(seq1))
+    assert np.all(np.isfinite(seq2))
+
     n = len(seq1)
     m = len(seq2)
 
@@ -80,6 +83,7 @@ def dtw(seq1: Sequence[Any], seq2: Sequence[Any], distance: Callable[[Any, Any],
         for j in range(max(0, i - w), min(m, i + w)):
             p2 = seq2[j]
             cost = distance(p1, p2)
+            assert np.isfinite(cost)
             dtw[i + 1, j + 1] = cost + min(
                 dtw[i, j + 1],  # insertion
                 dtw[i + 1, j],  # deletion
@@ -87,5 +91,8 @@ def dtw(seq1: Sequence[Any], seq2: Sequence[Any], distance: Callable[[Any, Any],
                 )
 
     r = dtw[n, m]
+
+    #print('r=', r, ' n=', n, ' m=', m)
+    assert np.isfinite(r)
     return r
 

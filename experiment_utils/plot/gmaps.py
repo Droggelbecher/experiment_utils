@@ -62,7 +62,7 @@ def polylines(ll, arrows = False, weight = 2):
     """
     for l, c in zip(ll, plt.cm.Set2(np.linspace(0, 1, len(ll)))):
         d = {
-                'path': [ { 'lat': lat, 'lng': lng } for lat, lng in l ],
+                'path': [ { 'lat': fix.lat, 'lng': fix.lon } for fix in l ],
                 'strokeColor': rgb2hex(c),
                 'strokeWeight': weight,
                 'strokeOpacity': 0.8,
@@ -336,7 +336,7 @@ function initialize()
 {{
     var mapProp = {{
         center: center,
-        zoom: 13,
+        zoom: 16,
         mapTypeControlOptions: {{
             mapTypeIds: [google.maps.MapTypeId.ROADMAP, customMapTypeId]
             }},
