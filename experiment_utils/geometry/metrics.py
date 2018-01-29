@@ -1,7 +1,8 @@
 
 import math
+from experiment_utils.warnings import deprecated
 
-
+@deprecated
 def geo(pos1, pos2):
     """
     Returns distance in meters between 2 lat/lon coordinates.
