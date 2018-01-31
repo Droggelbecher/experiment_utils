@@ -3,6 +3,7 @@
 import time
 from collections import namedtuple, defaultdict
 from typing import List, Tuple
+from functools import wraps
 
 from .text import format_table
 
