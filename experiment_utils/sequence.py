@@ -67,8 +67,8 @@ def dtw(seq1: Sequence[Any], seq2: Sequence[Any], distance: Callable[[Any, Any],
     """
     import numpy as np
 
-    assert np.all(np.isfinite(seq1))
-    assert np.all(np.isfinite(seq2))
+    # assert np.all(np.isfinite(seq1))
+    # assert np.all(np.isfinite(seq2))
 
     n = len(seq1)
     m = len(seq2)

@@ -9,7 +9,10 @@ import time
 import shutil
 import logging
 
-import pandas as pd
+try:
+    import pandas as pd
+except ModuleNotFoundError:
+    pd = None
 
 WRITE_CACHE = True
 READ_CACHE = True
@@ -104,7 +107,9 @@ def cache_hash(obj):
     elif isinstance(obj, tuple):
         r = hash(tuple(map(cache_hash, obj)))
 
-    elif isinstance(obj, pd.DataFrame):
+    # TODO: Do something similar for np arrays
+
+    elif pd and isinstance(obj, pd.DataFrame):
         r = pd.util.hash_pandas_object(obj).sum()
 
     elif hasattr(obj, 'cache_hash') and callable(obj.cache_hash):
@@ -214,7 +219,7 @@ def cached(filename_kws=(), ignore_kws=(), add_filenames=(), cache_if=ALWAYS,
         def new_f(**kws):
             add_filenames_ = add_filenames
             mapped_kws = _map_kws(kws, ignore_kws, key)
-            cache_path = _cache_path(f, (), kws)
+            cache_path = _cache_path(f, (), mapped_kws)
 
             # Which files determine whether our result is up to date?
 

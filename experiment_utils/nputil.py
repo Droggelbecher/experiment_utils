@@ -258,5 +258,10 @@ def offsets_to_coordinates(origin, offsets):
         origin + np.cumsum(offsets, axis = 0)
     ))
 
+def to_regular(a, dtype=float):
+    return a.view((dtype, len(a.dtype.names)))
+
+def to_structured(a, dtype):
+    return np.array(a, dtype=dtype)
 
 

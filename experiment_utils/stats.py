@@ -59,13 +59,18 @@ def print_stats(a, w=80, h=10):
     import numpy as np
     import sys
 
-    min_ = np.min(a)
-    max_ = np.max(a)
-    avg = np.average(a)
-    avg_idx = int(w * (avg - min_) / (max_ - min_)) - 1
+    clean = a[~np.isnan(a)]
+
+    min_ = np.min(clean)
+    max_ = np.max(clean)
+    avg = np.average(clean)
+    if max_ > min_:
+        avg_idx = int(w * (avg - min_) / (max_ - min_)) - 1
+    else:
+        avg_idx = 0
 
     bins = np.linspace(min_, max_, w)
-    hist, _ = np.histogram(a, bins=bins)
+    hist, _ = np.histogram(clean, bins=bins)
     hist = hist.astype('f8')
     hist *= float(h) / np.max(hist)
 
@@ -85,7 +90,7 @@ def print_stats(a, w=80, h=10):
     print(f'zeros={np.sum(a == 0)} nans={np.sum(np.isnan(a))}')
 
     qs = [1, 10, 25, 50, 75, 90, 99]
-    perc = np.percentile(a, q=qs)
+    perc = np.percentile(clean, q=qs)
     print()
     print('Percentiles:')
     for q, p in zip(qs, perc):

@@ -9,7 +9,7 @@ from .text import format_table
 
 class Timer:
     """
-    TODO: get_stats() probably doesn't handle recursive functions incorrectly currently
+    TODO: get_stats() probably doesn't handle recursive functions correctly currently
 
     Context manager for timing execution of code blocks
     >>> with Timer("frobnizing"):
