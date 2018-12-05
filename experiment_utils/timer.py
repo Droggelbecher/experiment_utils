@@ -79,7 +79,7 @@ class Timer:
                 tot_time[event.name] += event.t - stack[-1].t
                 calls[event.name] += 1
                 stack.pop()
-        assert not len(stack)
+        # assert not len(stack)
 
         l = list(tot_time.items())
         l.sort(key = lambda kv: -kv[1])
