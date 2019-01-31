@@ -258,10 +258,39 @@ def offsets_to_coordinates(origin, offsets):
         origin + np.cumsum(offsets, axis = 0)
     ))
 
-def to_regular(a, dtype=float):
-    return a.view((dtype, len(a.dtype.names)))
+def to_regular(a, dtype=None):
+    """
+    Convert a structured array $a to a regular ndarray (view).
+    """
+    if dtype is None:
+        dtype = a.dtype[0]
+
+    fields = a.dtype.names
+    shape = a.shape + (len(fields),)
+    offsets = [a.dtype.fields[name][1] for name in fields]
+    assert not np.any(np.diff(offsets, n=2))
+    strides = a.strides + (offsets[1] - offsets[0],)
+    r = np.ndarray(shape=shape, dtype=dtype, buffer=a, offset=offsets[0], strides=strides)
+
+    assert r.shape == (len(a), len(a.dtype.names)), (r.shape, len(a), len(a.dtype.names))
+    return r
+
+def to_regular_copy(a, dtype=None):
+    """
+    Convert a structured array $a to a regular ndarray as a copy.
+    """
+    if dtype is None:
+        dtype = a.dtype[0]
+    assert np.all([dtype == a.dtype[i] for i in range(len(a.dtype))]), a.dtype
+    l = [a[n] for n in a.dtype.names]
+    r = np.vstack(l).T
+    assert r.shape == (len(a), len(a.dtype.names)), (r.shape, len(a), len(a.dtype.names))
+    return r
 
 def to_structured(a, dtype):
+    """
+    Convert an ndarray $a to a structured array with the given $dtype.
+    """
     return np.array(a, dtype=dtype)
 
 
