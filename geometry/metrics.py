@@ -1,6 +1,6 @@
 
 import math
-from experiment_utils.warnings import deprecated
+from experiment_utils.warning_decorators import deprecated
 
 @deprecated
 def geo(pos1, pos2):
