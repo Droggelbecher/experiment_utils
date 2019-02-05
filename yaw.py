@@ -24,3 +24,5 @@ def compute_yaw(xs, ys):
     dy = np.hstack(([0], ys[1:] - ys[:-1]))
     return np.arctan2(dy, dx)
 
+def normyaw(ys):
+    return np.mod(ys+np.pi, 2.0 * np.pi) - np.pi
