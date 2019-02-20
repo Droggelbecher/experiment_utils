@@ -59,3 +59,30 @@ def haversine(pos1, pos2):
 
     return 6373000.0 * acos
 
+def kolmogorov_smirnov(a, b):
+    """
+    >>> a = np.array([0, 2, 5, 5, 5, 5], dtype=np.float)
+    >>> b = np.array([1, 1, 3, 3, 3, 5], dtype=np.float)
+    >>> kolmogorov_smirnov(a, b)
+    0.5
+    """
+    # https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test
+    v_a, sums_a = np.unique(a, return_counts=True)
+    sums_a = np.cumsum(sums_a, dtype=np.float)
+    sums_a /= sums_a[-1]
+
+    v_b, sums_b = np.unique(b, return_counts=True)
+    sums_b = np.cumsum(sums_b, dtype=np.float)
+    sums_b /= sums_b[-1]
+
+    def _max(s):
+        return s[-1] if len(s) else 0
+
+    sums_ab = np.array([_max(sums_a[v_a <= v]) for v in v_b])
+    d_a = np.max(np.abs(sums_ab - sums_b))
+
+    sums_ba = np.array([_max(sums_b[v_b <= v]) for v in v_a])
+    d_b = np.max(np.abs(sums_ba - sums_a))
+    return max(d_a, d_b)
+
+
