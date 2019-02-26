@@ -294,38 +294,56 @@ def to_structured(a, dtype):
     return np.array(a, dtype=dtype)
 
 
-def erode(a):
+def and_(a, *lambdas):
     """
-    >>> a = np.array([True, False, True, True, True, False, False, True, True])
-    >>> erode(a)
-    array([False, False, False, True, False, False, False, False, False])
+    Logical AND for numpy index computations that uses short-circuit evaluation
+    to evaluate later conditions on shorter arrays.
+
+    >>> gt5 = lambda a: a > 5
+    >>> even_count = 0
+    >>> def even(a):
+    ...   global even_count
+    ...   even_count += len(a)
+    ...   return a % 2 == 0
+    >>> a = np.arange(10)
+    >>> np.all(and_(a, gt5, even) == np.array([False, False, False, False, False, False, True, False, True, False]))
+    True
+    >>> even_count
+    4
+    >>> even_count = 0
+    >>> np.all((gt5(a) & even(a)) == np.array([False, False, False, False, False, False, True, False, True, False]))
+    True
+    >>> even_count
+    10
     """
-    return np.hstack(([False], a & a[1:] & a[:-1], [False]))
+    r = np.full(len(a), True)
+    for l in lambdas:
+        r[r] = l(a[r])
+    return r
 
-def dilate(a):
+def or_(a, *lambdas):
     """
-    >>> a = np.array([True, False, True, True, True, False, False, True, True])
-    >>> dilate(a)
-    array([True, True, True, True, True, True, True, True, True])
+    Logical OR for numpy index computations that uses short-circuit evaluation
+    to evaluate later conditions on shorter arrays.
+
+    >>> gt5 = lambda a: a > 5
+    >>> even_count = 0
+    >>> def even(a):
+    ...   global even_count
+    ...   even_count += len(a)
+    ...   return a % 2 == 0
+    >>> a = np.arange(10)
+    >>> np.all(or_(a, gt5, even) == np.array([True, False, True, False, True, False, True, True, True, True]))
+    True
+    >>> even_count
+    6
+    >>> even_count = 0
+    >>> np.all((gt5(a) | even(a)) == np.array([True, False, True, False, True, False, True, True, True, True]))
+    True
+    >>> even_count
+    10
     """
-    return np.hstack(([a[0]], a | a[1:] | a[:-1], [a[-1]]))
-
-
-def debounce(a):
-    """
-    >>> a = np.array([2,2,2,3,2,2,1,2,2,3,3,1,1,1,1,1])
-    >>> debounce(a)
-    """
-    us = np.unique(a)
-    # flaky = np.zeros(len(a), dtype=np.bool)
-    return a[0] + np.cumsum(np.convolve(np.diff(a), [.3,.4,.3], 'same'))
-
-    # TODO: Not sure if this approach makes sense yet
-    # for u in us:
-        # idx = (a == u)
-        # a[ erode(dilate(idx)) ] = u
-        # flaky |= (erode(dilate(a == u)) != dilate(erode(a == u)))
-    # return a
-
-
-
+    r = np.full(len(a), False)
+    for l in lambdas:
+        r[~r] = l(a[~r])
+    return r
