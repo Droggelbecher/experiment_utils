@@ -291,7 +291,7 @@ def to_structured(a, dtype):
     """
     Convert an ndarray $a to a structured array with the given $dtype.
     """
-    return np.array(a, dtype=dtype)
+    return np.core.records.fromarrays(a.T, dtype=dtype)
 
 
 def and_(a, *lambdas):
