@@ -8,6 +8,7 @@ import hashlib
 import time
 import shutil
 import logging
+import inspect
 
 try:
     import pandas as pd
@@ -174,6 +175,11 @@ def _get_from_cache(cache_path, f, kws, filenames):
 
 
 def _map_kws(kws, ignore_kws, key):
+    """
+    kws: Keyword arguments with values (dict)
+    ignore_kws: keyword argument names to ignore
+    key: optional callable key method 
+    """
     kws = {k: v for k, v in kws.items() if k not in ignore_kws}
     if callable(key):
         kws = {'key': key(kws)}
@@ -194,6 +200,18 @@ NEVER = lambda kws: False
 def cached(filename_kws=(), ignore_kws=(), add_filenames=(), cache_if=ALWAYS,
     compute_if=ALWAYS, cache_exception = NEVER, key=None):
     """
+    filename_kws: Iterable of keyword argument names that will be considered filenames
+                  (decorated callable will be evaluated only if the pointed to file changed)
+    ignore_kws:   Iterable of keyword argument names that will be ignored for recomputation
+                  consideration
+    add_filenames:Callable that given the dict of keyword arguments determines the filenames
+                  that should be treated as if existing in `filename_kws`.
+    key:          If provided and callable, used to compute the key for caching given keyword arg
+                  dict as input. If given, only this will be used to determine whether two function
+                  calls should be considered equivalent.
+
+    Returned method can only be called with keyword-only arguments.
+
     >>> @cached()
     ... def f(x):
     ...   print("calculating f(" + str(x) + ")")
@@ -216,13 +234,26 @@ def cached(filename_kws=(), ignore_kws=(), add_filenames=(), cache_if=ALWAYS,
     """
 
     def decorate(f):
+
+        # Get default keyword arguments for `f` with inspection
+        sig = inspect.signature(f)
+        default_kws = {
+            k: v.default for k, v in sig.parameters.items()
+            if v.default is not inspect.Parameter.empty
+        }
+
         def new_f(**kws):
             add_filenames_ = add_filenames
+            default_kws.update(kws)
+            kws = default_kws
+
+            # Translate kw args provided to `new_f` to kw args considered for caching
+            # (depending on parameters this might not be the exact same thing)
             mapped_kws = _map_kws(kws, ignore_kws, key)
+
             cache_path = _cache_path(f, (), mapped_kws)
 
             # Which files determine whether our result is up to date?
-
             filenames = set(mapped_kws[k] for k in filename_kws)
             if callable(add_filenames_):
                 add_filenames_ = add_filenames_(mapped_kws)
