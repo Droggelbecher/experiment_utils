@@ -20,8 +20,10 @@ def smooth_yaw_inplace(a):
     return a
 
 def compute_yaw(xs, ys):
-    dx = np.hstack(([0], xs[1:] - xs[:-1]))
-    dy = np.hstack(([0], ys[1:] - ys[:-1]))
+    # dx = np.hstack(([0], xs[1:] - xs[:-1]))
+    # dy = np.hstack(([0], ys[1:] - ys[:-1]))
+    dx = np.gradient(xs)
+    dy = np.gradient(ys)
     return np.arctan2(dy, dx)
 
 def normyaw(ys):
