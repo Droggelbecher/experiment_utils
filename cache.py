@@ -157,6 +157,8 @@ def _get_from_cache(cache_path, f, kws, filenames):
             return CACHE_COLLISION, None
 
         for filename in filenames:
+            if not filename: # Falsish filenames are considered intentionally left blank
+                continue
             try:
                 if os.stat(filename).st_mtime > cache_data['timestamp']:
                     logging.debug("answer for {}({}) in {} outdated, recomputing".format(f.__name__, kws, cache_path))
@@ -165,7 +167,7 @@ def _get_from_cache(cache_path, f, kws, filenames):
                 # Hmm file is not there.
                 # Dunno if it was there before. Lets default to recomputing
                 # (probably fast when an input file is missing)
-                logging.warning("input file {} not found for timestamp check, recomputing".format(filename))
+                logging.warning("input file '{}' not found for timestamp check, recomputing {}".format(filename, f.__name__))
                 break
         else:
             cache_file.close()

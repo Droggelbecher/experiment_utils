@@ -1,12 +1,14 @@
 
 import numpy as np
+from numba import jit
 
 def yawdiff(a, b):
     return np.mod(a-b+np.pi, 2.0 * np.pi) - np.pi
 
+@jit(nopython=True)
 def smooth_yaw_inplace(a):
     while True:
-        diffs = a[1:] - a[:-1]
+        diffs = np.diff(a) #a[1:] - a[:-1]
         idxs_gt = np.where(diffs > np.pi)[0]
         idxs_lt = np.where(diffs <= -np.pi)[0]
         if not len(idxs_gt) and not len(idxs_lt):
@@ -28,3 +30,8 @@ def compute_yaw(xs, ys):
 
 def normyaw(ys):
     return np.mod(ys+np.pi, 2.0 * np.pi) - np.pi
+
+if __name__ == '__main__':
+    yaws = np.array([ 0, 0.5, 1.0, 1.5, 2.0, -3.0, -2.0, 3.0, 4.0 ])
+    print(smooth_yaw_inplace(yaws))
+
