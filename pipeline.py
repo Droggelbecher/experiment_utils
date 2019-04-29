@@ -1,74 +1,85 @@
+import os
+from experiment_utils.hashing import cache_hash
+import pickle
 
+class Unknown:
+    @classmethod
+    def __bool__(cls, self):
+        return False
 
-"""
-Problem statement:
+class Value:
+    def __init__(self, value=Unknown, hash_=Unknown):
+        self._hash = hash_
+        self._value = value
 
-Lets say we have some functions that work with large data as input and output, eg large
-numpy arrays (but could by anything):
+    def load_value(self):
+        assert self._value is not Unknown
+        return self._value
 
-def foo(a):
-    return a + 1
+    def get_hash(self):
+        if self._hash is Unknown:
+            self._hash = cache_hash(self._value)
+        return self._hash
 
-def bar(a):
-    return a * 2
-
-def main():
-    b = foo(a)
-    c = bar(b)
-
-Now lets assume these functions are pure in the sense that the same input will always produce
-the same result and at the same time they incur long running computations.
-Since this is data analysis settings we would like to cache function results to disk.
-Now we can put a @cached to foo() and bar(), and assuming the result is already cached then main would do this:
-
-1. Compute the hash for a (somewhat expensive)
-2. Load b from disk
-3. Compute the hash of b (somewhat expensive)
-4. Load c from disk
-
-This approach has several issues:
-a. Data is loaded from disk that is never used as it is input to another cached computation
-b. Worse we need to calculate hash values on data that is not needed
-c. Whenever a function implementation changes (which happens all the time), we might forget
-   to explicitely clear the cache
-
-c.) can possibly be addressed with some introspection (can we get a hash value of the code of a function from interpreter?)
-a. + b.) Are a bit more tricky.
-
-- Hash annotation
-  We could return together with the actual data a (stored) hash value of it to pass on to the next
-  cache lookup. This would still unnecessarily load the data, but avoid computation of the hashes.
-  Downside is the result is a special object (value + hash), not just the value we expect.
-  Maybe we can get around this with a central (ram) registry of object id -> hash. That would of course
-  brake as soon as a copy is made of a returned value.
-
-- Call graph:
-  Instead of just wrapping functions into a cache handler, we could construct a call graph
-  similar to eg tensorflow.
-  TODO: Learn more about how tensorflow does it. Maybe they do already everything we need and
-  we can just use it?
-  Returned values would be parts of these graphs, explicit execution in the last step would be necessary
-  to receive a value.
-  This can avoid loading & hashing and give potential other benifits (like some automatic parallelization?)
-  The cost are somewhat different semantics.
-
-"""
-
-ram_storage = {}
+    def cache_hash(self):
+        return self.get_hash()
 
 class RamStorage:
     def __init__(self):
         self.hashes = {}
         self.values = {}
 
-    def __getitem__(self, key):
+    def load(self, key):
+        if key not in self.hashes:
+            raise KeyError()
         return Value(hash_=self.hashes[key], value=self.values[key])
 
-    def __setitem__(self, key, value):
-        self.values[key] = value
-        self.hashes[key] = hash(value)
+    def save(self, key, value):
+        if isinstance(value, Value):
+            self.values[key] = value.value
+            self.hashes[key] = value.hash
+        else:
+            self.values[key] = value
+            self.hashes[key] = cache_hash(value)
 
-# TODO: DiskStorage which loads value only ondemand
+class DiskStorage:
+    def __init__(self, base_dir):
+        self.base_dir = base_dir
+
+    def _get_hash_filename(self, key):
+        return self.base_dir + '/' + hex(abs(key)) + '_hash.p'
+
+    def _get_value_filename(self, key):
+        return self.base_dir + '/' + hex(abs(key)) + '_value.p'
+
+    def load(self, key):
+        filename = self._get_hash_filename(key)
+        if not os.path.exists(filename):
+            raise KeyError()
+
+        with open(filename, 'rb') as f:
+            h = pickle.load(f)
+
+        def load_value():
+            filename = self._get_value_filename(key)
+            with open(filename, 'rb') as f:
+                v = pickle.load(f)
+            return v
+
+        r = Value(hash_=h)
+        r.load_value = load_value
+        return r
+
+
+    def save(self, key, value):
+        if not os.path.exists(self.base_dir):
+            os.mkdir(self.base_dir)
+
+        with open(self._get_hash_filename(key), 'wb') as f:
+            pickle.dump(value.get_hash(), f)
+
+        with open(self._get_value_filename(key), 'wb') as f:
+            pickle.dump(value.load_value(), f)
 
 class Call:
     def __init__(self, op, args, kws):
@@ -79,8 +90,8 @@ class Call:
     def __repr__(self):
         return f'{str(self.operation)}(args={self.args}, kws={self.kws})'
 
-    def __hash__(self):
-        return hash(self.operation)
+    def cache_hash(self):
+        return cache_hash(self.operation)
 
 class CallExecution:
     def __init__(self, call, args, kws):
@@ -97,26 +108,12 @@ class CallExecution:
     def __repr__(self):
         return repr(self.call) + repr(self.args) + repr(self.kws)
 
-    def __hash__(self):
-        # TODO: proper hashing, see cache.py
-        return hash((
-            hash(self.call),
-            # hash(tuple(self.args)),
-            # hash(self.kws)
+    def cache_hash(self):
+        return cache_hash((
+            cache_hash(self.call),
+            cache_hash(self.args),
+            cache_hash(self.kws)
         ))
-
-    # def load_return_value(self):
-
-class Unknown: pass
-
-class Value:
-    def __init__(self, value=Unknown, hash_=Unknown):
-        self.hash = hash_
-        self.value = value
-
-    def load_value(self):
-        if self.value is not Unknown:
-            return self.value
 
 class Session:
     def __init__(self, storage):
@@ -132,12 +129,13 @@ class Session:
         kws = {k: self.compute(v) for k, v in call.kws.items()}
 
         execution = CallExecution(call, args=args, kws=kws)
+        key = cache_hash(execution)
 
         try:
-            result = self.storage[hash(execution)]
+            result = self.storage.load(key)
         except KeyError:
             result = execution.compute()
-            self.storage[hash(execution)] = result
+            self.storage.save(key, result)
 
         return result
 
@@ -145,7 +143,6 @@ class Session:
 class Operation:
     def __init__(self, f):
         self.f = f
-        # self.f.__code__.__hash__()
 
     def __call__(self, *args, **kws):
         return Call(self, args, kws)
@@ -153,8 +150,9 @@ class Operation:
     def __repr__(self):
         return self.f.__name__
 
-    def __hash__(self):
-        return hash(self.f.__code__)
+    def cache_hash(self):
+        r = cache_hash(self.f.__code__.co_code)
+        return r
 
     def compute(self, args_values, kws_values):
         return self.f(*args_values, **kws_values)
@@ -168,6 +166,8 @@ def operation():
 
 def main():
 
+    import numpy as np
+
     @operation()
     def foo(a):
         print("actually computing: foo a=", a)
@@ -178,14 +178,16 @@ def main():
         print("actually computing: bar a=", a)
         return a * 2
 
-    a = 1
+    # During `compute(c)` this will cache intermediate results
+    # In next run it will only load the hash of `b` and `c` from disk.
+    # Only in the final `.load_value()`, `c`s actual value is loaded from disk.
+    a = np.arange(10000000)
     b = foo(a)
     c = bar(b)
-    print(c)
 
-    s = Session(ram_storage)
-    print('compute=',s.compute(c))
-    print('compute=',s.compute(c))
+    s = Session(storage=DiskStorage('_cache_test'))
+    print('compute=',s.compute(c).load_value())
+    print('compute=',s.compute(c).load_value())
 
 
 if __name__ == '__main__':
