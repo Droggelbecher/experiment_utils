@@ -10,8 +10,10 @@ class DataFrame:
     def __init__(self, a=(), columns=(), *, data={}, copy=True, dtype=None):
         self._columns = {}
 
-        for i, name in enumerate(columns):
-            self._columns[name] = np.array(a[:, i], copy=copy, dtype=dtype)
+        if columns:
+            a = np.array(a).reshape((-1, len(columns)))
+            for i, name in enumerate(columns):
+                self._columns[name] = np.array(a[:, i], copy=copy, dtype=dtype)
 
         self._columns.update({
             name: np.array(v, copy=copy, dtype=dtype) for name, v in data.items()
@@ -27,7 +29,11 @@ class DataFrame:
         return [(k, v.dtype) for (name, v) in self._columns]
 
     def __len__(self):
-        return len(tuple(self._columns.values())[0])
+        try:
+            # print('__len__', len(tuple(self._columns.values())[0]))
+            return len(tuple(self._columns.values())[0])
+        except IndexError:
+            return 0
 
     def _normalize_index(self, index):
         def is_seq(x):
@@ -51,12 +57,25 @@ class DataFrame:
         elif isinstance(col, str):
             col = (col,)
 
+        if isinstance(row, Sequence) and len(row) > len(self):
+            raise IndexError
+
+        if isinstance(row, slice) and (
+                    (row.start is not None and (row.start < 0))
+                 or (row.stop is not None and (row.stop > len(self)))
+        ):
+            raise IndexError
+
         # At this point row is a slice or sequence
         # and col is a sequence of column names
         return (row, col)
 
     def __getitem__(self, index):
         row, col = self._normalize_index(index)
+
+        # if len(col) == 1:
+            # return self._columns[col[0]][row]
+
         return DataFrame(
             data = {k: self._columns[k][row] for k in col},
             copy = False
@@ -65,9 +84,14 @@ class DataFrame:
     def __setitem__(self, index, value):
         row, col = self._normalize_index(index)
 
+        full_column = isinstance(row, slice) and row.start is None and row.stop is None
+
         if isinstance(value, np.ndarray):
             for i, k in enumerate(col):
-                self._columns[k][row] = value[i]
+                if full_column:
+                    self._columns[k] = value[i]
+                else:
+                    self._columns[k][row] = value[i]
 
         else:
             for k in col:
@@ -127,13 +151,29 @@ class DataFrame:
         )
         return self[r, :]
 
+    def _to_array(self, other):
+        if isinstance(other, DataFrame):
+            return other.array()
+        return other
+
+    def __add__(self, other):
+        return self.array() + self._to_array(other)
+
+    def __sub__(self, other):
+        return self.array() - self._to_array(other)
+
+    def __mul__(self, other):
+        return self.array() * self._to_array(other)
+
+    def __div__(self, other):
+        return self.array() / self._to_array(other)
 
     def __str__(self):
-        from text import format_table
+        from .text import format_table
         columns = self.names
         return format_table(
             [
-                [self._columns[k][i] for k in columns]
+                [((i < len(self._columns[k])) and self._columns[k][i] or '-') for k in columns]
                 for i in range(len(self))
             ],
             headers = columns
