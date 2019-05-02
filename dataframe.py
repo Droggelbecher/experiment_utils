@@ -2,15 +2,21 @@
 import numpy as np
 from collections.abc import Sequence
 
+from .nputil import to_regular
+
 class DataFrame:
     """
     - All columns and only columns have (string) names
     """
 
-    def __init__(self, a=(), columns=(), *, data={}, copy=True, dtype=None):
+    def __init__(self, a=None, columns=None, *, data={}, copy=True, dtype=None):
         self._columns = {}
 
-        if columns:
+        if a is not None:
+            if not columns and a.dtype.names:
+                columns = a.dtype.names
+                a = to_regular(a)
+
             a = np.array(a).reshape((-1, len(columns)))
             for i, name in enumerate(columns):
                 self._columns[name] = np.array(a[:, i], copy=copy, dtype=dtype)
@@ -151,6 +157,14 @@ class DataFrame:
         )
         return self[r, :]
 
+    def each(self, column_name, f):
+        c = self._columns[column_name]
+        u = np.unique(c)
+        return [
+            f(self[c == uu])
+            for uu in u
+        ]
+
     def _to_array(self, other):
         if isinstance(other, DataFrame):
             return other.array()
@@ -169,7 +183,7 @@ class DataFrame:
         return self.array() / self._to_array(other)
 
     def __str__(self):
-        from .text import format_table
+        from text import format_table
         columns = self.names
         return format_table(
             [
@@ -241,6 +255,9 @@ if __name__ == '__main__':
     s['foo'] = 333 # This doesn't
     print(df)
 
+    a = np.array([(1,2,3), (4,5,6)], dtype=[('a', 'f8'), ('b', 'f8'), ('c', 'f8')])
+    print(a)
+    print(DataFrame(a))
 
     # df[1, 'a']
     # df[:, 'a']
